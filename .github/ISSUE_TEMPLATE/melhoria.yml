@@ -1,0 +1,24 @@
+name: Melhoria
+description: Uma ideia para o projeto
+labels: [melhoria]
+body:
+  - type: textarea
+    id: proposta
+    attributes:
+      label: O que você propõe
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivo
+    attributes:
+      label: O que isso resolve
+      description: O caso de uso concreto por trás da ideia.
+    validations:
+      required: true
+
+  - type: textarea
+    id: norma
+    attributes:
+      label: Norma, se for regra fiscal
+      description: Lei, artigo e parágrafo, ou nota técnica.

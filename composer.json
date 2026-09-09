@@ -1,0 +1,116 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "4devsmart/demo-nfse",
+    "type": "project",
+    "description": "Demonstracao de emissao de NFS-e com Laravel, Filament e a wrapper-api fiscal.",
+    "keywords": [
+        "laravel",
+        "filament",
+        "nfse",
+        "fiscal"
+    ],
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+        "filament/filament": "^5.0",
+        "laravel/framework": "^13.17",
+        "laravel/tinker": "^3.0"
+    },
+    "require-dev": {
+        "deptrac/deptrac": "^4.7",
+        "fakerphp/faker": "^1.23",
+        "infection/infection": "^0.35",
+        "larastan/larastan": "^3.11",
+        "laravel/boost": "^2.7",
+        "laravel/pail": "^1.2.5",
+        "laravel/pao": "^1.0.6",
+        "laravel/pint": "^1.27",
+        "lucascudo/laravel-pt-br-localization": "^3.0",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/collision": "^8.6",
+        "phpunit/phpunit": "^12.5.12"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "setup": [
+            "composer install",
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php artisan key:generate",
+            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
+            "@php artisan migrate --force",
+            "@php artisan db:seed --force",
+            "@php artisan filament:assets"
+        ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan serve --host=0.0.0.0 --port=8080"
+        ],
+        "test": [
+            "@php artisan config:clear --ansi @no_additional_args",
+            "@php artisan test"
+        ],
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi",
+            "@php artisan filament:upgrade"
+        ],
+        "post-update-cmd": [
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+        ],
+        "post-root-package-install": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "@php artisan key:generate --ansi",
+            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
+            "@php artisan migrate --graceful --ansi"
+        ],
+        "pre-package-uninstall": [
+            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "qualidade": [
+            "@php artisan config:clear --ansi @no_additional_args",
+            "@php vendor/bin/pint --test",
+            "@php vendor/bin/phpstan analyse --memory-limit=1G",
+            "@php vendor/bin/deptrac analyse --no-progress",
+            "@php artisan test"
+        ],
+        "cobertura": [
+            "@php artisan config:clear --ansi @no_additional_args",
+            "@php vendor/bin/phpunit --coverage-text --coverage-filter=app"
+        ],
+        "mutacao": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan config:clear --ansi @no_additional_args",
+            "@php -d memory_limit=-1 vendor/bin/infection --threads=max --no-interaction"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "allow-plugins": {
+            "infection/extension-installer": true,
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

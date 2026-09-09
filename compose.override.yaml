@@ -1,0 +1,25 @@
+# Desenvolvimento. Carregado automaticamente por `docker compose up`.
+services:
+  app:
+    build:
+      target: dev
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:${APP_PORT:-8080}
+    # `!override` troca a lista inteira do compose.yaml em vez de somar a ela:
+    # sem isso o volume nomeado `app-storage` continuaria montado por cima de
+    # /app/storage, escondendo o storage do bind mount.
+    volumes: !override
+      # O codigo vem do host: editar e recarregar, sem rebuild.
+      - .:/app:z
+    restart: "no"
+
+  # Em desenvolvimento a porta sai para fora so para abrir o Swagger da propria
+  # API. Em producao ela nao existe.
+  fiscal-api:
+    ports:
+      - "${FISCAL_PORT:-8081}:8080"

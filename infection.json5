@@ -1,0 +1,76 @@
+{
+    // Testes de mutacao: o portao que os outros tres nao dao.
+    //
+    // Pint diz que o codigo esta formatado, PHPStan que os tipos fecham e o
+    // PHPUnit que a suite passa — nenhum deles diz se a suite *notaria* uma
+    // mudanca de comportamento. O Infection troca `>=` por `>`, `+` por `-`,
+    // apaga o corpo de um metodo, e pergunta: algum teste quebrou? Mutante que
+    // sobrevive e linha coberta sem assercao que a defenda.
+    //
+    // O driver de cobertura e o pcov (docker/php.dev.ini), so na imagem de dev.
+    $schema: './vendor/infection/infection/resources/schema.json',
+
+    source: {
+        directories: ['app'],
+
+        excludes: [
+            // Fora por dois motivos, nao por um.
+            //
+            // O primeiro e que quase tudo aqui e declaracao: rotulo, icone,
+            // cor, ordem de campo. Trocar 'primary' por '' nao quebra teste
+            // nenhum porque nao ha comportamento ali — so ruido no relatorio.
+            //
+            // O segundo e o preco. Cada mutante do Filament so morre por teste
+            // Livewire, e cada teste Livewire sobe o Laravel inteiro: a camada
+            // sozinha levava a rodada de minutos para dezenas de minutos, e
+            // portao que ninguem espera nao e portao.
+            //
+            // O que essas telas fazem de fato — decidir se uma acao pode rodar,
+            // traduzir desfecho em aviso — nao mora nelas: mora em
+            // ImpedimentosDaNota, em StatusNota e nas Actions, que entram.
+            'Filament',
+
+            // Amarracao de container e de painel. Quem prova que funciona e a
+            // suite inteira subindo, nao um mutante.
+            'Providers',
+        ],
+    },
+
+    // O relatorio fica fora do versionamento: e foto de uma execucao.
+    logs: {
+        text: 'storage/infection/mutantes.txt',
+        summary: 'storage/infection/resumo.txt',
+        html: 'storage/infection/relatorio.html',
+    },
+
+    tmpDir: 'storage/infection/tmp',
+
+    // O padrao do Infection e 10s por mutante, pensado para teste de unidade.
+    // Aqui quase todo mutante morre por teste de feature, que sobe o Laravel
+    // inteiro — e com 7 threads disputando CPU isso passa de 10s sem que haja
+    // laco infinito nenhum. O problema e que timeout CONTA COMO MORTO: na
+    // primeira medicao a mesma suite deu 79% numa rodada e 87% na seguinte,
+    // sem uma linha de teste mudar: 71 timeouts viraram 155, e cada timeout a
+    // mais e um mutante escapado contado como morto. Com 30s nao sobrou
+    // nenhum, e o numero honesto caiu para 72%. Portao que sobe quando a
+    // maquina piora nao mede qualidade, mede carga.
+    timeout: 30,
+
+    // Piso do portao. Nao e meta: e a linha abaixo da qual a suite regrediu.
+    //   minMsi        — sobre todos os mutantes, inclusive os de linha sem teste
+    //   minCoveredMsi — so sobre o que a suite ja cobre; e o numero honesto
+    // Medido em 06/09/2026, com `timeout: 30` e nenhum timeout registrado:
+    // 1381 mutantes, 1336 mortos, 45 escapados, MSI 96%, 4m em 7 threads.
+    // O piso fica logo abaixo — e regressao, nao meta.
+    //
+    // O total cresceu de 1163 para 1369 sem uma linha de `app/` ter sido
+    // acrescentada: o Infection so gera mutante para linha coberta, entao
+    // cobrir `CodigoDeFalha::significado()` e a pagina do fluxo aumentou o
+    // denominador antes de aumentar o numerador. Comparar totais entre rodadas
+    // com cobertura diferente nao diz nada; o que diz e o MSI.
+    minMsi: 93,
+    minCoveredMsi: 93,
+
+    testFramework: 'phpunit',
+    testFrameworkOptions: '--no-coverage',
+}

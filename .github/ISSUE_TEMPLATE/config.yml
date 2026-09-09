@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Falha na wrapper-api
+    url: https://github.com/4devsmart/wrapper-api/issues
+    about: Rota, rejeição do provedor ou comportamento da API fiscal são de lá, não daqui.
+  - name: Vulnerabilidade
+    url: https://github.com/4devsmart/demo-nfse/security/advisories/new
+    about: Não abra issue pública. Use o reporte privado.

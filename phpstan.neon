@@ -1,0 +1,63 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 8
+
+    paths:
+        - app
+        - database
+        - tests
+
+    # O PHPStan trata tipo de PHPDoc como certeza absoluta. Em Laravel isso
+    # produz falso positivo perigoso: `Seeder::$command` é destipado e o próprio
+    # framework o testa com `isset()`, e o `find()` do Eloquent é anotado como
+    # não-nulo. Seguir o analisador nesses dois casos removeria proteção real.
+    treatPhpDocTypesAsCertain: false
+
+    ignoreErrors:
+        # O Filament resolve o tipo dos parâmetros de closure em tempo de
+        # execução, pelo nome. Não há como o analisador inferir isso.
+        - identifier: missingType.generics
+
+        # O provider pt_BR do Faker (`cnpj()`, `cpf()`) existe em runtime, mas
+        # não está no tipo do Generator.
+        -
+            identifier: method.notFound
+            path: database/factories/*.php
+            message: '#Faker\\Generator::(cnpj|cpf)#'
+
+        # `up()` é convenção do migrator, e não contrato da classe base: a
+        # migration anônima não expõe tipo nenhum. O teste da conversão de dados
+        # precisa rodá-la de novo, já com linha antiga no banco, porque o
+        # `RefreshDatabase` a rodou quando ainda não havia linha alguma.
+        -
+            identifier: method.notFound
+            path: tests/Feature/ListaDeServicosTest.php
+            message: '#Migration::up\(\)#'
+
+# Regras proprias, sobre a arvore que o PHPStan ja monta. Elas respondem o que o
+# Deptrac nao alcanca: nome de metodo chamado, valor de argumento, e chamada que
+# faltou. As fronteiras entre camadas continuam no `deptrac.php`.
+services:
+    -
+        class: Tests\Apoio\PhpStan\TabelaComDeferLoadingRule
+        tags: [phpstan.rules.rule]
+    -
+        class: Tests\Apoio\PhpStan\TabelaComEagerLoadingRule
+        tags: [phpstan.rules.rule]
+    -
+        class: Tests\Apoio\PhpStan\TabelaComColunasDemaisRule
+        tags: [phpstan.rules.rule]
+    -
+        class: Tests\Apoio\PhpStan\ListaGrandeEhBuscavelRule
+        tags: [phpstan.rules.rule]
+    -
+        class: Tests\Apoio\PhpStan\IconeComoEnumRule
+        tags: [phpstan.rules.rule]
+    -
+        class: Tests\Apoio\PhpStan\PesoDaFonteComoEnumRule
+        tags: [phpstan.rules.rule]
+    -
+        class: Tests\Apoio\PhpStan\UniqueSemIgnoreRecordRule
+        tags: [phpstan.rules.rule]

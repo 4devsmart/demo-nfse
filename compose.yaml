@@ -1,0 +1,69 @@
+# Base: e o que roda em producao.
+#   producao        docker compose -f compose.yaml up -d
+#   desenvolvimento docker compose up -d          (soma o compose.override.yaml)
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: prod
+    # APP_KEY e FISCAL_API_TOKEN vem daqui. Sao segredo: nao ficam no compose.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /app/storage/database/database.sqlite
+      FISCAL_API_URL: http://fiscal-api:8080
+    volumes:
+      # storage/ guarda o SQLite e os logs: e o unico estado da aplicacao.
+      - app-storage:/app/storage
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      - fiscal-api
+    networks: [nfse]
+    restart: unless-stopped
+
+  # Atende HTTP. Sem porta publicada: quem chama e o container `app`, pelo nome
+  # do servico na rede interna. E assim que a imagem foi desenhada.
+  fiscal-api:
+    image: ghcr.io/4devsmart/wrapper-api/api:v1
+    # A imagem existe so para linux/amd64: a ACBrLib e biblioteca nativa. Sem
+    # fixar a plataforma, o pull em Mac com Apple Silicon e em Windows ARM para
+    # com "no matching manifest for linux/arm64/v8". Fixando, o Docker Desktop
+    # sobe os dois containers emulados.
+    platform: linux/amd64
+    environment:
+      API_TOKEN: ${FISCAL_API_TOKEN:-troque-este-token}
+      ACBR_WORKERS: /run/wrapper/fiscal.sock
+    volumes:
+      - fiscal-run:/run/wrapper
+    depends_on:
+      - fiscal-worker
+    networks: [nfse]
+    restart: unless-stopped
+
+  # Fala com o ACBr. O encontro com o `fiscal-api` e o socket em /run/wrapper.
+  fiscal-worker:
+    image: ghcr.io/4devsmart/wrapper-api/api:v1
+    platform: linux/amd64
+    command: ["worker"]
+    # A imagem traz um healthcheck HTTP, que so vale para o `fiscal-api`. O
+    # worker nao atende HTTP: sem desligar, ele aparece eternamente "unhealthy".
+    healthcheck:
+      disable: true
+    volumes:
+      - fiscal-run:/run/wrapper
+    networks: [nfse]
+    restart: unless-stopped
+
+networks:
+  nfse:
+
+volumes:
+  fiscal-run:
+  app-storage:

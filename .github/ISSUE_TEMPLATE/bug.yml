@@ -1,0 +1,54 @@
+name: Bug
+description: Algo não funciona como descrito
+labels: [bug]
+body:
+  - type: textarea
+    id: o-que-acontece
+    attributes:
+      label: O que acontece
+      description: O comportamento observado, e o que você esperava no lugar.
+    validations:
+      required: true
+
+  - type: textarea
+    id: como-reproduzir
+    attributes:
+      label: Como reproduzir
+      description: Os passos, do estado inicial até o erro.
+      placeholder: |
+        1. Abro Nova NFS-e
+        2. Preencho ...
+        3. Clico em Transmitir
+    validations:
+      required: true
+
+  - type: input
+    id: municipio
+    attributes:
+      label: Município do emitente
+      description: Nome e código IBGE. O município decide o provedor, e o provedor decide o que existe.
+      placeholder: Porto Alegre, 4314902
+
+  - type: dropdown
+    id: ambiente
+    attributes:
+      label: Ambiente
+      options:
+        - Homologação
+        - Produção
+    validations:
+      required: true
+
+  - type: textarea
+    id: retorno
+    attributes:
+      label: Retorno da API
+      description: O código e a mensagem, quando houver. Não cole certificado, senha nem token.
+      render: text
+
+  - type: input
+    id: versao
+    attributes:
+      label: Commit ou data do clone
+    validations:
+      required: true
