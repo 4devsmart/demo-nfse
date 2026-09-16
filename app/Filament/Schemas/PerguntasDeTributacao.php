@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Filament\Schemas;
 
+use App\Actions\Municipios\PreverProvedorDoMunicipio;
+use App\Actions\Municipios\ProvedorPrevisto;
 use App\Consultas\BuscaDeCargasTributarias;
+use App\Consultas\BuscaDeCidades;
 use App\Consultas\BuscaDeClassificacoes;
 use App\Consultas\BuscaDeCodigosDeServico;
 use App\Consultas\BuscaDeIndicadores;
+use App\Consultas\ClientesTomadores;
 use App\Consultas\EmpresasEmitentes;
 use App\Consultas\EstadoDoFormulario;
 use App\Consultas\PadroesDaEmpresa;
@@ -360,6 +364,27 @@ final class PerguntasDeTributacao
                 ->helperText(fn (Get $get): string => $indicadores->explicacaoDe(self::texto($get('indicador_de_operacao')))
                     ?? __('Onde a operação se considera ocorrida.')),
 
+            // Só para os provedores que leem o `cLocalidadeIncid` dentro do RPS.
+            // No Padrão Nacional e nos outros ABRASF ele vem calculado na NFS-e
+            // devolvida, e perguntar aqui seria pedir um dado que ninguém lê.
+            //
+            // Escondido, o campo continua gravando. Trocar para um emitente
+            // cujo provedor não lê o campo limpa a localidade, e sem gravar o
+            // vazio a do emitente anterior ficava no banco e ia na DPS.
+            Select::make('cidade_incidencia_ibs_cbs_id')
+                ->label(__('Localidade de incidência do IBS/CBS'))
+                ->placeholder(__('Busque pelo nome ou pelo código IBGE'))
+                ->searchable()
+                ->native(false)
+                ->required(fn (Get $get): bool => self::perguntaALocalidade($get))
+                ->columnSpan(12)
+                ->visible(fn (Get $get): bool => self::perguntaALocalidade($get))
+                ->dehydratedWhenHidden()
+                ->getSearchResultsUsing(fn (string $search): array => app(BuscaDeCidades::class)->procurar($search))
+                ->getOptionLabelUsing(fn (mixed $value): ?string => app(BuscaDeCidades::class)->rotuloDe(self::chave($value)))
+                ->afterStateHydrated(fn (Get $get, Set $set) => self::sugerirLocalidadeDoTomador($get, $set))
+                ->helperText(__('O provedor deste emitente pede o local da operação (LC 214/2025, art. 11). Vem do município do tomador, que é a regra geral; troque se a operação for sobre imóvel, presencial ou em evento, porque aí vale onde ela acontece.')),
+
             // Aqui, e não na etapa do serviço, porque é aqui que a obrigação
             // nasce: a rejeição E0322 exige o `cNBS` quando a DPS declara
             // qualquer informação de IBS/CBS, e não quando ela descreve o
@@ -673,6 +698,72 @@ final class PerguntasDeTributacao
                 $falhar(__('Informe a alíquota efetiva do Simples, ou responda "Não": zerada, o grupo não sai na nota.'));
             }
         };
+    }
+
+    /**
+     * Sugere o municipio do tomador como localidade de incidencia, que e a
+     * regra geral do art. 11, X, da LC 214/2025.
+     *
+     * Chamado quando muda o tomador, quando muda o emitente e quando o
+     * formulario abre. Substitui so o que ele mesmo sugeriu: municipio
+     * escolhido a mao e decisao de quem emite, porque imovel, servico
+     * presencial e evento puxam o local para onde a operacao acontece.
+     *
+     * Provedor que nao le o campo apaga a localidade, inclusive a escolhida a
+     * mao: ela era do emitente anterior, e a revisao nao pode mostrar uma
+     * localidade que nao vai na DPS. Com a API fora do ar nao se sabe o
+     * provedor, e o campo fica como esta.
+     */
+    public static function sugerirLocalidadeDoTomador(Get $get, Set $set, mixed $tomadorAnterior = null): void
+    {
+        $provedor = self::provedorPrevisto($get);
+
+        if (! $provedor->consultado()) {
+            return;
+        }
+
+        if (! $provedor->exigeLocalidadeDeIncidencia()) {
+            $set('cidade_incidencia_ibs_cbs_id', null);
+
+            return;
+        }
+
+        $tomadores = app(ClientesTomadores::class);
+        $atual = self::chave($get('cidade_incidencia_ibs_cbs_id'));
+        $sugeridaAntes = $tomadores->cidadeDe(self::chave($tomadorAnterior ?? $get('cliente_id')));
+
+        if ($atual !== null && (int) $atual !== $sugeridaAntes) {
+            return;
+        }
+
+        $set('cidade_incidencia_ibs_cbs_id', $tomadores->cidadeDe(self::chave($get('cliente_id'))));
+    }
+
+    private static function perguntaALocalidade(Get $get): bool
+    {
+        return (bool) $get('tem_ibs_cbs') && self::provedorPrevisto($get)->exigeLocalidadeDeIncidencia();
+    }
+
+    /**
+     * A mesma previsao da caixa do provedor, e com o mesmo cache: perguntar a
+     * cada desenho nao sai para a rede. API fora do ar esconde o campo, como
+     * esconde qualquer afirmacao sobre o municipio.
+     */
+    private static function provedorPrevisto(Get $get): ProvedorPrevisto
+    {
+        $empresa = app(EmpresasEmitentes::class)->encontrar(self::chave($get('empresa_id')));
+
+        return $empresa === null
+            ? ProvedorPrevisto::naoConsultado()
+            : app(PreverProvedorDoMunicipio::class)->executar($empresa->municipio());
+    }
+
+    /**
+     * Id vindo do formulario: inteiro, texto, ou nada. Texto vazio e nada.
+     */
+    private static function chave(mixed $estado): int|string|null
+    {
+        return is_int($estado) || (is_string($estado) && $estado !== '') ? $estado : null;
     }
 
     /**

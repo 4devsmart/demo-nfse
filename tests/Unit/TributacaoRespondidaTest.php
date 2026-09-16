@@ -183,12 +183,14 @@ class TributacaoRespondidaTest extends TestCase
             'indicador_de_operacao' => '020201',
             'classificacao_tributaria' => '000001',
             'codigo_credito_presumido' => '000010',
+            'cidade_incidencia_ibs_cbs_id' => 42,
         ]);
 
         $this->assertNull($dados['cst_ibs_cbs']);
         $this->assertNull($dados['indicador_de_operacao']);
         $this->assertNull($dados['classificacao_tributaria']);
         $this->assertNull($dados['codigo_credito_presumido']);
+        $this->assertNull($dados['cidade_incidencia_ibs_cbs_id']);
     }
 
     public function test_pergunta_ausente_nao_mexe_em_retencao_federal_nenhuma(): void

@@ -90,7 +90,7 @@ final readonly class SubstituirNota
             // sai com base de calculo e ISSQN diferentes da original.
             ...$original->only([
                 'empresa_id', 'cliente_id', 'cidade_prestacao_id', 'ambiente',
-                'codigo_servico', 'cnae', 'item_lista_servico', 'nbs', 'competencia',
+                'codigo_servico', 'cnae', 'item_lista_servico', 'codigo_tributacao_municipio', 'nbs', 'competencia',
                 'deducoes', 'desconto_incondicionado', 'desconto_condicionado',
                 'tributacao_issqn', 'retencao_issqn',
                 'tipo_suspensao', 'numero_processo_suspensao',

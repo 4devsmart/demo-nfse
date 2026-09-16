@@ -127,14 +127,24 @@ class NotaForm
                 ->native(false)
                 ->required()
                 ->live()
-                ->afterStateUpdated(function (mixed $state, Set $set) use ($padroes): void {
+                ->afterStateUpdated(function (mixed $state, Get $get, Set $set) use ($padroes): void {
+                    // O `$set` não passa pelo `formatStateUsing` do campo, que só
+                    // roda ao hidratar. Sem converter aqui, o "2.0000" do banco
+                    // chegava cru à máscara e aparecia como 20.000.
                     foreach ($padroes->paraNota($state) as $campo => $valor) {
-                        $set($campo, $valor);
+                        $set($campo, in_array($campo, PadroesDaEmpresa::PERCENTUAIS, true) ? Campos::comoPercentual($valor) : $valor);
                     }
+
+                    // Outro emitente pode ter outro provedor, e com ele muda
+                    // se a localidade de incidência vai ou não na DPS.
+                    PerguntasDeTributacao::sugerirLocalidadeDoTomador($get, $set);
                 })
                 ->columnSpan(6),
 
-            SeletorDeTomador::campo()->columnSpan(6),
+            SeletorDeTomador::campo()
+                ->live()
+                ->afterStateUpdated(fn (mixed $old, Get $get, Set $set) => PerguntasDeTributacao::sugerirLocalidadeDoTomador($get, $set, $old))
+                ->columnSpan(6),
 
             // Quem recebe a DPS sai do municipio do emitente, e nao do da
             // prestacao. Sem isto so se descobre na transmissao, que e tarde:
@@ -314,6 +324,18 @@ class NotaForm
                 ->placeholder('6201501')
                 ->columnSpan(4)
                 ->default(fn (): mixed => self::padraoDoEmitente('cnae')),
+
+            // Cada município tem a própria tabela, então não há lista a
+            // oferecer: o código vem do cadastro do emitente ou de quem emite.
+            TextInput::make('codigo_tributacao_municipio')
+                ->label(__('Código de tributação municipal'))
+                ->maxLength(20)
+                ->columnSpan(4)
+                ->default(fn (): mixed => self::padraoDoEmitente('codigo_tributacao_municipio'))
+                ->helperText(fn (): string => self::origemDoPadrao(
+                    'codigo_tributacao_municipio',
+                    __('Da tabela do município. Há provedores que recusam a nota sem ele (no GISS, rejeição E202).'),
+                )),
         ];
     }
 
@@ -579,7 +601,7 @@ class NotaForm
     {
         $campos = [
             'empresa_id', 'cliente_id', 'cidade_prestacao_id', 'competencia',
-            'descricao_servico', 'codigo_servico', 'cnae', 'item_lista_servico',
+            'descricao_servico', 'codigo_servico', 'cnae', 'item_lista_servico', 'codigo_tributacao_municipio',
             'valor_servico', 'aliquota_iss', 'deducoes',
             'desconto_incondicionado', 'desconto_condicionado',
             'tributacao_issqn', 'retencao_issqn',
@@ -587,6 +609,7 @@ class NotaForm
             'aliquota_csll', 'aliquota_irrf', 'aliquota_previdenciaria',
             'contribuicoes_retidas',
             'cst_ibs_cbs', 'indicador_de_operacao', 'classificacao_tributaria',
+            'cidade_incidencia_ibs_cbs_id',
 
             // As perguntas viajam junto com os campos que elas governam: campo
             // escondido não perde o valor, e sem a resposta a revisão mostraria

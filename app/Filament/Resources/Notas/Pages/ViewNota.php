@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Filament\Resources\Notas\Pages;
 
 use App\Filament\Resources\Notas\Acoes\AcoesDaNota;
+use App\Filament\Resources\Notas\Acoes\AcoesDeConsulta;
 use App\Filament\Resources\Notas\NotaResource;
 use App\Models\Nota;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Support\Icons\Heroicon;
@@ -14,6 +16,16 @@ use Filament\Support\Icons\Heroicon;
 class ViewNota extends ViewRecord
 {
     protected static string $resource = NotaResource::class;
+
+    /**
+     * O modal com a resposta da consulta por RPS. Não aparece como botão: a
+     * própria consulta o abre no lugar do seu modal, e para isso ele precisa
+     * existir na página.
+     */
+    public function resultadoDaConsultaPorRpsAction(): Action
+    {
+        return AcoesDeConsulta::resultadoDaConsultaPorRps();
+    }
 
     public function getTitle(): string
     {
@@ -41,6 +53,7 @@ class ViewNota extends ViewRecord
             AcoesDaNota::emitir(),
             AcoesDaNota::gerarDps(),
             AcoesDaNota::transmitir(),
+            AcoesDaNota::consultarLote(),
             AcoesDaNota::consultarDps(),
             AcoesDaNota::consultarNoProvedor(),
             AcoesDaNota::baixarDanfse(),

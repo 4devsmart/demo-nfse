@@ -220,6 +220,7 @@ class ConsultasDoPainelTest extends TestCase
             'codigo_servico_padrao' => '140101',
             'cnae_padrao' => '9511800',
             'item_lista_servico_padrao' => '14.01',
+            'codigo_tributacao_municipio_padrao' => '140101',
             'aliquota_iss_padrao' => 3,
         ]);
 
@@ -230,6 +231,7 @@ class ConsultasDoPainelTest extends TestCase
             'codigo_servico' => '140101',
             'cnae' => '9511800',
             'item_lista_servico' => '14.01',
+            'codigo_tributacao_municipio' => '140101',
             'nbs' => null,
             'aliquota_iss' => '3.0000',
             'cst_pis_cofins' => null,

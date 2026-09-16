@@ -6,7 +6,9 @@ namespace App\Filament\Resources\Notas\Pages;
 
 use App\Consultas\ResumoDeNotas;
 use App\Domain\Enums\StatusNota;
+use App\Filament\Resources\Notas\Acoes\AcoesDeConsulta;
 use App\Filament\Resources\Notas\NotaResource;
+use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -16,6 +18,16 @@ use Illuminate\Database\Eloquent\Builder;
 class ListNotas extends ListRecords
 {
     protected static string $resource = NotaResource::class;
+
+    /**
+     * O modal com a resposta da consulta por RPS. Não aparece como botão: a
+     * própria consulta o abre no lugar do seu modal, e para isso ele precisa
+     * existir na página.
+     */
+    public function resultadoDaConsultaPorRpsAction(): Action
+    {
+        return AcoesDeConsulta::resultadoDaConsultaPorRps();
+    }
 
     public function getSubheading(): string
     {

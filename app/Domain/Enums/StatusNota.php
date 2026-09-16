@@ -13,6 +13,10 @@ use Filament\Support\Icons\Heroicon;
  * O ciclo de vida da nota dentro deste sistema. `Indeterminada` existe porque a
  * transmissao pode dar timeout depois de a prefeitura ter recebido a DPS: nesse
  * caso reenviar duplica documento fiscal, e o caminho e consultar pelo id_dps.
+ *
+ * `EmProcessamento` e o outro lado da mesma cautela. Provedor que recebe por lote
+ * assincrono, como o GISS 2.04, responde so "lote recebido" e decide depois. Ali
+ * se sabe que o lote chegou, e o que falta e o desfecho, que sai do protocolo.
  */
 enum StatusNota: string implements HasColor, HasIcon, HasLabel
 {
@@ -21,6 +25,7 @@ enum StatusNota: string implements HasColor, HasIcon, HasLabel
     case Autorizada = 'autorizada';
     case Rejeitada = 'rejeitada';
     case Indeterminada = 'indeterminada';
+    case EmProcessamento = 'em_processamento';
     case Cancelada = 'cancelada';
     case Substituida = 'substituida';
 
@@ -32,6 +37,7 @@ enum StatusNota: string implements HasColor, HasIcon, HasLabel
             self::Autorizada => __('Autorizada'),
             self::Rejeitada => __('Rejeitada'),
             self::Indeterminada => __('Desfecho indeterminado'),
+            self::EmProcessamento => __('Em processamento'),
             self::Cancelada => __('Cancelada'),
             self::Substituida => __('Substituída'),
         };
@@ -45,6 +51,7 @@ enum StatusNota: string implements HasColor, HasIcon, HasLabel
             self::Autorizada => 'success',
             self::Rejeitada => 'danger',
             self::Indeterminada => 'warning',
+            self::EmProcessamento => 'info',
             self::Cancelada => 'danger',
             self::Substituida => 'warning',
         };
@@ -58,6 +65,7 @@ enum StatusNota: string implements HasColor, HasIcon, HasLabel
             self::Autorizada => Heroicon::OutlinedCheckBadge,
             self::Rejeitada => Heroicon::OutlinedXCircle,
             self::Indeterminada => Heroicon::OutlinedQuestionMarkCircle,
+            self::EmProcessamento => Heroicon::OutlinedClock,
             self::Cancelada => Heroicon::OutlinedArchiveBoxXMark,
             self::Substituida => Heroicon::OutlinedArrowPathRoundedSquare,
         };
@@ -74,6 +82,7 @@ enum StatusNota: string implements HasColor, HasIcon, HasLabel
             self::Autorizada => __('O provedor autorizou. O XML protocolado está guardado aqui.'),
             self::Rejeitada => __('O provedor recusou e disse o motivo. Nada foi autorizado.'),
             self::Indeterminada => __('A transmissão não teve resposta. A nota PODE existir no provedor.'),
+            self::EmProcessamento => __('O provedor recebeu o lote e ainda não decidiu. A nota pode sair autorizada ou recusada.'),
             self::Cancelada => __('A nota existiu e o evento de cancelamento foi registrado.'),
             self::Substituida => __('Foi trocada por outra nota, que a referencia.'),
         };
@@ -89,6 +98,7 @@ enum StatusNota: string implements HasColor, HasIcon, HasLabel
             self::Rascunho => 'POST /v1/nfse/xml',
             self::DpsGerada, self::Rejeitada => 'POST /v1/nfse/transmissao',
             self::Indeterminada => 'POST /v1/nfse/consulta-dps',
+            self::EmProcessamento => 'POST /v1/nfse/transmissao/lote',
             self::Autorizada => 'POST /v1/nfse/eventos/cancelamento',
             self::Cancelada, self::Substituida => null,
         };
@@ -106,6 +116,7 @@ enum StatusNota: string implements HasColor, HasIcon, HasLabel
             self::Autorizada => __('Autorizada. Guarde o XML: não há segunda via dele.'),
             self::Rejeitada => __('O provedor recusou. Corrija o que ele apontou abaixo e transmita de novo.'),
             self::Indeterminada => __('Não reenvie: a nota pode já existir. Use "Consultar DPS" para descobrir.'),
+            self::EmProcessamento => __('Não reenvie: o lote já está no provedor. Use "Consultar lote" para saber se virou nota.'),
             self::Cancelada => __('Cancelada. Para refazer o serviço, abra uma nova nota.'),
             self::Substituida => __('Substituída. A nota que a substituiu está ligada a ela.'),
         };
@@ -135,6 +146,16 @@ enum StatusNota: string implements HasColor, HasIcon, HasLabel
     public function pedeConsulta(): bool
     {
         return $this === self::Indeterminada;
+    }
+
+    /**
+     * O lote chegou ao provedor e o desfecho ainda nao voltou. Nao e o mesmo que
+     * `pedeConsulta()`: la nao se sabe se a DPS chegou, e a pergunta e pelo
+     * id_dps; aqui se sabe, e a pergunta e pelo protocolo.
+     */
+    public function aguardaLote(): bool
+    {
+        return $this === self::EmProcessamento;
     }
 
     /**

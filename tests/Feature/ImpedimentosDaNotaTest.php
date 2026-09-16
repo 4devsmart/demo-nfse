@@ -68,6 +68,48 @@ class ImpedimentosDaNotaTest extends TestCase
     }
 
     /**
+     * O ABRASF nao tem chave de acesso: cancela pelo numero. O link que vem no
+     * campo da chave nao basta, e a falta dele nao impede.
+     */
+    public function test_nota_abrasf_cancela_pelo_numero_e_nao_pela_chave(): void
+    {
+        $comNumero = Nota::factory()->create([
+            'empresa_id' => Empresa::factory()->comCertificado(),
+            'status' => StatusNota::Autorizada,
+            'provedor' => 'Giss (abrasf)',
+            'chave' => null,
+            'numero_nfse' => '1234',
+        ]);
+
+        $soComLink = Nota::factory()->create([
+            'empresa_id' => Empresa::factory()->comCertificado(),
+            'status' => StatusNota::Autorizada,
+            'provedor' => 'Giss (abrasf)',
+            'chave' => 'https://guarulhos.giss.com.br/nfse/1234',
+            'numero_nfse' => null,
+        ]);
+
+        $this->assertNull($comNumero->impedimentos()->paraCancelar());
+        $this->assertStringContainsString('pelo número', (string) $soComLink->impedimentos()->paraCancelar());
+    }
+
+    /**
+     * O outro lado: no Padrao Nacional o numero nao substitui a chave.
+     */
+    public function test_nota_do_padrao_nacional_continua_precisando_da_chave(): void
+    {
+        $nota = Nota::factory()->create([
+            'empresa_id' => Empresa::factory()->comCertificado(),
+            'status' => StatusNota::Autorizada,
+            'provedor' => 'PadraoNacional (padrao_nacional)',
+            'chave' => null,
+            'numero_nfse' => '1234',
+        ]);
+
+        $this->assertStringContainsString('chave de acesso', (string) $nota->impedimentos()->paraCancelar());
+    }
+
+    /**
      * Substituir e cancelar mais um requisito: o numero que o provedor atribuiu.
      * O que impede cancelar impede substituir antes, e primeiro.
      */

@@ -10,6 +10,7 @@ use App\Fiscal\Excecoes\FalhaFiscal;
 use App\Fiscal\Pedidos\ConsultaPorRps;
 use App\Fiscal\Pedidos\ContextoDoProvedor;
 use App\Fiscal\Pedidos\MotivoDoCancelamento;
+use App\Fiscal\Pedidos\NotaCancelada;
 use App\Fiscal\Pedidos\NotaSubstituida;
 use App\Fiscal\Pedidos\PayloadDps;
 use App\Fiscal\Respostas\Danfse;
@@ -43,6 +44,9 @@ final class GatewayFiscalFalso implements GatewayFiscal
 
     public ?FalhaFiscal $falhaNoCancelamento = null;
 
+    /** Como a nota foi identificada no ultimo cancelamento: chave ou numero. */
+    public ?NotaCancelada $ultimaNotaCancelada = null;
+
     public ?FalhaFiscal $falhaNoDanfse = null;
 
     /** Quantas vezes a tabela de provedores foi perguntada, para cobrar o cache. */
@@ -55,9 +59,19 @@ final class GatewayFiscalFalso implements GatewayFiscal
     /** @var list<DocumentoDistribuido> */
     private array $filaDfe = [];
 
+    /** @var list<string> */
+    public array $protocolosConsultados = [];
+
+    /** @var list<string> numero/serie, na ordem em que foram perguntados */
+    public array $rpsConsultados = [];
+
+    private ?string $retornoDoRps = null;
+
     private ?NotaTransmitida $respostaDaTransmissao = null;
 
     private ?EventoRegistrado $respostaDoCancelamento = null;
+
+    private ?NotaTransmitida $respostaDoLote = null;
 
     private ?MunicipioAtendido $respostaDoMunicipio = null;
 
@@ -71,6 +85,16 @@ final class GatewayFiscalFalso implements GatewayFiscal
     public function falharNaTransmissaoCom(FalhaFiscal $falha): void
     {
         $this->falhaNaTransmissao = $falha;
+    }
+
+    public function responderRpsCom(string $retornoDaBiblioteca): void
+    {
+        $this->retornoDoRps = $retornoDaBiblioteca;
+    }
+
+    public function responderLoteCom(NotaTransmitida $resposta): void
+    {
+        $this->respostaDoLote = $resposta;
     }
 
     public function responderCancelamentoCom(EventoRegistrado $evento): void
@@ -139,6 +163,23 @@ final class GatewayFiscalFalso implements GatewayFiscal
         );
     }
 
+    public function consultarLote(ContextoDoProvedor $contexto, string $protocolo): NotaTransmitida
+    {
+        $this->protocolosConsultados[] = $protocolo;
+
+        return $this->respostaDoLote ?? new NotaTransmitida(
+            status: 'processando',
+            numero: '',
+            chave: '',
+            codigoDeVerificacao: '',
+            protocolo: $protocolo,
+            situacao: '',
+            xmlEmBase64: '',
+            erros: Mensagens::vazia(),
+            alertas: Mensagens::vazia(),
+        );
+    }
+
     public function consultarDps(ContextoDoProvedor $contexto, string $idDps): RespostaCrua
     {
         return new RespostaCrua(0, "nota encontrada para {$idDps}", base64_encode('<NFSe/>'));
@@ -157,8 +198,10 @@ final class GatewayFiscalFalso implements GatewayFiscal
         return new RespostaCrua(0, $resposta, base64_encode('<NFSe/>'));
     }
 
-    public function cancelarNota(ContextoDoProvedor $contexto, string $chave, MotivoDoCancelamento $motivo): EventoRegistrado
+    public function cancelarNota(ContextoDoProvedor $contexto, NotaCancelada $nota, MotivoDoCancelamento $motivo): EventoRegistrado
     {
+        $this->ultimaNotaCancelada = $nota;
+
         if ($this->falhaNoCancelamento instanceof FalhaFiscal) {
             throw $this->falhaNoCancelamento;
         }
@@ -166,7 +209,7 @@ final class GatewayFiscalFalso implements GatewayFiscal
         return $this->respostaDoCancelamento ?? new EventoRegistrado(
             tipo: 'cancelamento',
             status: 'concluido',
-            chave: $chave,
+            chave: $nota->chave,
             protocolo: 'PROTO-CANC',
             dataHora: now()->toIso8601String(),
             xmlEmBase64: base64_encode('<evento/>'),
@@ -192,7 +235,9 @@ final class GatewayFiscalFalso implements GatewayFiscal
 
     public function consultarPorRps(ContextoDoProvedor $contexto, ConsultaPorRps $consulta): RespostaCrua
     {
-        return new RespostaCrua(0, "RPS {$consulta->serie}/{$consulta->numero} encontrado", base64_encode('<NFSe/>'));
+        $this->rpsConsultados[] = "{$consulta->numero}/{$consulta->serie}";
+
+        return new RespostaCrua(0, $this->retornoDoRps ?? "RPS {$consulta->serie}/{$consulta->numero} encontrado", base64_encode('<NFSe/>'));
     }
 
     public function substituirNota(

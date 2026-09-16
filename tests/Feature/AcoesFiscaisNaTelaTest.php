@@ -12,6 +12,7 @@ use App\Fiscal\Excecoes\DesfechoIndeterminado;
 use App\Fiscal\Excecoes\FalhaFiscal;
 use App\Fiscal\Respostas\EventoRegistrado;
 use App\Fiscal\Respostas\Mensagens;
+use App\Fiscal\Respostas\NotaTransmitida;
 use App\Models\Empresa;
 use App\Models\Nota;
 use App\Models\User;
@@ -144,6 +145,46 @@ class AcoesFiscaisNaTelaTest extends TestCase
         $this->assertSame(StatusNota::Indeterminada, $nota->refresh()->status);
 
         Notification::assertNotified('Desfecho indeterminado');
+    }
+
+    /**
+     * O lote é perguntado pelo protocolo que a transmissão gravou, e o aviso é
+     * o mesmo que a transmissão daria se o provedor tivesse decidido na hora.
+     */
+    public function test_consultar_o_lote_pela_tela_avisa_o_desfecho_da_nota(): void
+    {
+        $nota = Nota::factory()->comDpsGerada()->create([
+            'empresa_id' => Empresa::factory()->comCertificado(),
+            'status' => StatusNota::EmProcessamento,
+            'protocolo' => 'PROTO-1',
+        ]);
+
+        $this->gateway->responderLoteCom(new NotaTransmitida(
+            status: 'autorizado',
+            numero: '202600000123',
+            chave: '',
+            codigoDeVerificacao: 'ABC123',
+            protocolo: 'PROTO-1',
+            situacao: '',
+            xmlEmBase64: base64_encode('<CompNfse/>'),
+            erros: Mensagens::vazia(),
+            alertas: Mensagens::vazia(),
+        ));
+
+        Livewire::test(ViewNota::class, ['record' => $nota->getKey()])
+            ->callAction('consultarLote')
+            ->assertHasNoActionErrors();
+
+        $this->assertSame(['PROTO-1'], $this->gateway->protocolosConsultados);
+        $this->assertSame(StatusNota::Autorizada, $nota->refresh()->status);
+
+        Notification::assertNotified(
+            Notification::make()
+                ->success()
+                ->persistent()
+                ->title(StatusNota::Autorizada->getLabel())
+                ->body($nota->identificacao()),
+        );
     }
 
     public function test_cancelar_pela_tela_registra_o_evento(): void
@@ -319,9 +360,10 @@ class AcoesFiscaisNaTelaTest extends TestCase
 
         Livewire::test(ViewNota::class, ['record' => $nota->getKey()])
             ->callAction('consultarPorRps', ['numero' => '42', 'serie' => 'A1'])
-            ->assertHasNoActionErrors();
+            ->assertHasNoErrors()
+            ->assertActionMounted('resultadoDaConsultaPorRps');
 
-        Notification::assertNotified('Retorno do provedor (código 0)');
+        $this->assertSame(['42/A1'], $this->gateway->rpsConsultados);
     }
 
     /**

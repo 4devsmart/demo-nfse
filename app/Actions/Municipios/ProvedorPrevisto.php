@@ -19,6 +19,9 @@ final readonly class ProvedorPrevisto
     /** Como a API nomeia o leiaute do Padrao Nacional em `GET /nfse/municipios`. */
     private const LEIAUTE_NACIONAL = 'padrao_nacional';
 
+    /** @var list<string> */
+    private const PROVEDORES_COM_LOCALIDADE_NO_RPS = ['Giss', 'Ginfes', 'Saatri', 'ISSNatal'];
+
     private function __construct(private ?MunicipioAtendido $municipio) {}
 
     public static function de(MunicipioAtendido $municipio): self
@@ -54,6 +57,21 @@ final readonly class ProvedorPrevisto
     public function ehPadraoNacional(): bool
     {
         return $this->municipio?->layout === self::LEIAUTE_NACIONAL;
+    }
+
+    /**
+     * O provedor quer o `cLocalidadeIncid` dentro do RPS?
+     *
+     * A lista sai dos gravadores do ACBr que escrevem o campo como obrigatorio
+     * no RPS: Giss 2.04, Ginfes, Saatri 2.03 e ISSNatal. Nos outros ABRASF ele
+     * so aparece na NFS-e que o provedor devolve, e no Padrao Nacional quem o
+     * calcula e a Sefin. Tinus e SpeedGov o aceitam opcional e ficam de fora: o
+     * Tinus, recebendo o campo, anexa ao RPS o grupo de valores da NFS-e
+     * inteiro, que esta nota nao preenche.
+     */
+    public function exigeLocalidadeDeIncidencia(): bool
+    {
+        return in_array($this->municipio?->provedor, self::PROVEDORES_COM_LOCALIDADE_NO_RPS, true);
     }
 
     public function descricao(): string

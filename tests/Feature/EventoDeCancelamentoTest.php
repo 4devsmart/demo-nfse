@@ -45,6 +45,31 @@ class EventoDeCancelamentoTest extends TestCase
         $this->actingAs(User::factory()->create());
     }
 
+    /**
+     * No Padrao Nacional o pedido identifica a nota so pela chave, como sempre
+     * identificou. No ABRASF, pelo numero e pelo codigo de verificacao.
+     */
+    public function test_o_leiaute_do_provedor_decide_como_a_nota_e_identificada(): void
+    {
+        $nacional = $this->notaAutorizada();
+        $giss = $this->notaAutorizada();
+        $giss->forceFill([
+            'provedor' => 'Giss (abrasf)',
+            'chave' => null,
+            'numero_nfse' => '1234',
+            'codigo_verificacao' => 'ABC123',
+        ])->save();
+
+        app(CancelarNota::class)->executar($nacional, MotivoDoCancelamento::descrito('Emitida com valor incorreto'));
+        $this->assertSame((string) $nacional->chave, $this->gateway->ultimaNotaCancelada?->chave);
+        $this->assertSame([], $this->gateway->ultimaNotaCancelada->paraEvento());
+
+        app(CancelarNota::class)->executar($giss, MotivoDoCancelamento::descrito('Emitida com valor incorreto'));
+        $this->assertSame(['numero' => '1234', 'codigo_verificacao' => 'ABC123'], $this->gateway->ultimaNotaCancelada?->paraEvento());
+        $this->assertSame([], $this->gateway->ultimaNotaCancelada->paraApi());
+        $this->assertSame(StatusNota::Cancelada, $giss->refresh()->status);
+    }
+
     public function test_o_cancelamento_guarda_o_xml_do_evento_e_o_protocolo(): void
     {
         $nota = $this->notaAutorizada();

@@ -15,6 +15,7 @@ use App\Fiscal\Http\WrapperFiscal;
 use App\Fiscal\Pedidos\ConsultaPorRps;
 use App\Fiscal\Pedidos\ContextoDoProvedor;
 use App\Fiscal\Pedidos\MotivoDoCancelamento;
+use App\Fiscal\Pedidos\NotaCancelada;
 use App\Fiscal\Pedidos\NotaSubstituida;
 use App\Fiscal\Pedidos\PayloadDps;
 use Illuminate\Http\Client\ConnectionException;
@@ -124,6 +125,46 @@ class WrapperFiscalTest extends TestCase
 
         $this->assertFalse($resposta->foiAutorizada());
         $this->assertCount(1, $resposta->erros);
+    }
+
+    /**
+     * O GISS 2.04 responde a transmissao com 202: lote recebido, sem nota. Nao
+     * e sucesso para gravar como autorizada, nem falha para reenviar.
+     */
+    public function test_lote_recebido_volta_como_em_processamento(): void
+    {
+        Http::fake([
+            self::URL.'/v1/nfse/transmissao' => Http::response(['status' => 'processando', 'protocolo' => '2993258'], 202),
+        ]);
+
+        $resposta = $this->wrapper()->transmitirDps($this->contexto(), base64_encode('<Rps/>'));
+
+        $this->assertTrue($resposta->estaEmProcessamento());
+        $this->assertFalse($resposta->foiAutorizada());
+        $this->assertSame('2993258', $resposta->protocolo);
+    }
+
+    /**
+     * O desfecho do lote vem no formato da transmissao, e a recusa em 422 com o
+     * mesmo corpo: e com o motivo que a nota volta a ser corrigida.
+     */
+    public function test_a_consulta_do_lote_leva_o_protocolo_e_le_a_recusa(): void
+    {
+        Http::fake([
+            self::URL.'/v1/nfse/transmissao/lote' => Http::response([
+                'status' => 'rejeitado',
+                'protocolo' => '2993258',
+                'erros' => [['codigo' => 'E202', 'descricao' => 'Código de tributação não informado']],
+            ], 422),
+        ]);
+
+        $resposta = $this->wrapper()->consultarLote($this->contexto(), '2993258');
+
+        $this->assertFalse($resposta->foiAutorizada());
+        $this->assertFalse($resposta->estaEmProcessamento());
+        $this->assertSame('E202 Código de tributação não informado', $resposta->erros->emLinhas());
+        Http::assertSent(fn ($requisicao): bool => $requisicao->data()['protocolo'] === '2993258'
+            && $requisicao->data()['municipio'] === '3304557');
     }
 
     public function test_a_transmissao_leva_municipio_emitente_e_certificado(): void
@@ -278,7 +319,7 @@ class WrapperFiscalTest extends TestCase
         $chamadas = [
             'cancelamento' => fn () => $this->wrapper()->cancelarNota(
                 $this->contexto(),
-                str_repeat('3', 50),
+                NotaCancelada::pelaChave(str_repeat('3', 50)),
                 MotivoDoCancelamento::descrito('Valor lançado errado na emissão'),
             ),
             'substituicao' => fn () => $this->wrapper()->substituirNota(
@@ -321,7 +362,7 @@ class WrapperFiscalTest extends TestCase
 
         $cancelamento = $this->wrapper()->cancelarNota(
             $this->contexto(),
-            str_repeat('3', 50),
+            NotaCancelada::pelaChave(str_repeat('3', 50)),
             MotivoDoCancelamento::descrito('Valor lançado errado na emissão'),
         );
 
@@ -414,7 +455,7 @@ class WrapperFiscalTest extends TestCase
 
         $this->wrapper()->cancelarNota(
             $this->contexto(),
-            str_repeat('3', 50),
+            NotaCancelada::pelaChave(str_repeat('3', 50)),
             MotivoDoCancelamento::descrito('Valor lançado errado na emissão'),
         );
 
@@ -425,6 +466,33 @@ class WrapperFiscalTest extends TestCase
                 && $corpo['evento'] === ['codigo' => '1', 'motivo' => 'Valor lançado errado na emissão']
                 && $corpo['municipio'] === '3304557'
                 && $corpo['certificado']['pfx_b64'] === base64_encode('pfx');
+        });
+    }
+
+    /**
+     * O ABRASF cancela pelo numero. A chave de uma nota ABRASF e so o link dela,
+     * e sem link o campo nem vai: e a wrapper que diz o que falta.
+     */
+    public function test_o_cancelamento_abrasf_leva_o_numero_dentro_do_evento(): void
+    {
+        Http::fake([self::URL.'/v1/nfse/eventos/cancelamento' => Http::response(['status' => 'concluido'])]);
+
+        $this->wrapper()->cancelarNota(
+            $this->contexto(),
+            NotaCancelada::peloNumero('1234', 'ABC123'),
+            MotivoDoCancelamento::descrito('Valor lançado errado na emissão'),
+        );
+
+        Http::assertSent(function ($requisicao): bool {
+            $corpo = $requisicao->data();
+
+            return ! array_key_exists('chave', $corpo)
+                && $corpo['evento'] === [
+                    'codigo' => '1',
+                    'motivo' => 'Valor lançado errado na emissão',
+                    'numero' => '1234',
+                    'codigo_verificacao' => 'ABC123',
+                ];
         });
     }
 

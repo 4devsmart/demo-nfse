@@ -34,7 +34,10 @@ final readonly class TributacaoRespondida
             'percentual_simples_nacional',
         ],
         'tem_retencao_federal' => ['cst_pis_cofins'],
-        'tem_ibs_cbs' => ['cst_ibs_cbs', 'indicador_de_operacao', 'classificacao_tributaria', 'codigo_credito_presumido'],
+        'tem_ibs_cbs' => [
+            'cst_ibs_cbs', 'indicador_de_operacao', 'classificacao_tributaria', 'codigo_credito_presumido',
+            'cidade_incidencia_ibs_cbs_id',
+        ],
     ];
 
     /**

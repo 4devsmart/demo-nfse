@@ -6,14 +6,20 @@ namespace App\Filament\Resources\Notas\Acoes;
 
 use App\Actions\Municipios\PreverProvedorDoMunicipio;
 use App\Actions\Notas\ConsultarDpsPendente;
+use App\Actions\Notas\ConsultarLoteDaNota;
 use App\Actions\Notas\ConsultarNotaNoProvedor;
 use App\Actions\Notas\ConsultarPorRps;
+use App\Consultas\ConferenciaComOProvedor;
 use App\Filament\Suporte\OperacaoFiscal;
 use App\Fiscal\Pedidos\ConsultaPorRps;
+use App\Fiscal\Respostas\NfseConsultada;
 use App\Models\Nota;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
+use Filament\Pages\Page;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\View\View;
 
 /**
  * Os três caminhos para perguntar ao provedor o que aconteceu com um documento.
@@ -42,6 +48,26 @@ final class AcoesDeConsulta
             ));
 
         return OperacaoFiscal::bloqueadaQuando($acao, fn ($impedimentos): ?string => $impedimentos->paraConsultarADps());
+    }
+
+    /**
+     * A segunda metade da transmissão nos provedores assíncronos. Conclui a
+     * nota pelo protocolo; reenviar a DPS com o lote no provedor duplicaria o
+     * RPS.
+     */
+    public static function consultarLote(): Action
+    {
+        $acao = Action::make('consultarLote')
+            ->label(__('Consultar lote'))
+            ->icon(Heroicon::OutlinedClock)
+            ->color('info')
+            ->visible(fn (Nota $nota): bool => $nota->status->aguardaLote())
+            ->action(fn (Nota $nota, ConsultarLoteDaNota $consultar) => OperacaoFiscal::executar(
+                fn () => $consultar->executar($nota),
+                fn () => OperacaoFiscal::avisarDesfechoDaNota($nota->refresh()),
+            ));
+
+        return OperacaoFiscal::bloqueadaQuando($acao, fn ($impedimentos): ?string => $impedimentos->paraConsultarOLote());
     }
 
     /**
@@ -79,18 +105,96 @@ final class AcoesDeConsulta
             // ficou sem resposta, que nao tem id_dps nem chave para consultar.
             ->visible(fn (Nota $nota): bool => $nota->temDpsMontada() || $nota->temXmlAutorizado() || $nota->status->pedeConsulta())
             ->schema(self::camposDoRps())
-            ->action(fn (Nota $nota, array $data, ConsultarPorRps $consultar) => OperacaoFiscal::executar(
-                fn () => OperacaoFiscal::avisarRetornoCru(
-                    $consultar->executar($nota, ConsultaPorRps::sobreORps(
+            ->action(fn (Nota $nota, array $data, ConsultarPorRps $consultar, Page $livewire) => OperacaoFiscal::executar(
+                function () use ($nota, $data, $consultar, $livewire): void {
+                    $consulta = ConsultaPorRps::sobreORps(
                         numero: (string) $data['numero'],
                         serie: (string) $data['serie'],
                         tipo: (string) ($data['tipo'] ?? '1'),
                         codigoDeVerificacao: (string) ($data['codigo_verificacao'] ?? ''),
-                    )),
-                ),
+                    );
+
+                    $livewire->replaceMountedAction(
+                        'resultadoDaConsultaPorRps',
+                        self::resultadoParaATela($nota, $consulta, NfseConsultada::doRetorno($consultar->executar($nota, $consulta))),
+                    );
+                },
             ));
 
         return OperacaoFiscal::bloqueadaQuando($acao, fn ($impedimentos): ?string => $impedimentos->paraFalarComOProvedor());
+    }
+
+    /**
+     * O que a consulta por RPS achou, num modal próprio. Não tem botão: quem a
+     * abre é `consultarPorRps`, trocando o modal do pedido pelo da resposta, e
+     * as páginas a registram por `resultadoDaConsultaPorRpsAction()`.
+     *
+     * Antes o retorno ia cru num aviso de 400 caracteres, e o cancelamento, que
+     * fica no fim do XML, nunca aparecia.
+     */
+    public static function resultadoDaConsultaPorRps(): Action
+    {
+        return Action::make('resultadoDaConsultaPorRps')
+            ->modalHeading(fn (array $arguments): string => __('Consulta do RPS :rps', ['rps' => $arguments['rps'] ?? '']))
+            ->modalWidth(Width::TwoExtraLarge)
+            ->modalContent(fn (array $arguments): View => view('filament.notas.consulta-rps', ['resultado' => $arguments]))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('Fechar'));
+    }
+
+    /**
+     * Só texto e booleano: os argumentos de uma ação vivem no estado do
+     * Livewire, e é daqui que a view desenha. O documento XML não vai junto;
+     * quem o guarda é "Buscar XML do evento", que consulta de novo do servidor.
+     *
+     * @return array<string, mixed>
+     */
+    private static function resultadoParaATela(Nota $nota, ConsultaPorRps $consulta, NfseConsultada $consultada): array
+    {
+        $conferencia = app(ConferenciaComOProvedor::class);
+        $ehDaNota = $conferencia->ehORpsDaNota($nota, $consulta->numero, $consulta->serie);
+
+        $estado = match (true) {
+            ! $consultada->foiEncontrada() => 'sem-nota',
+            $consultada->cancelada => 'cancelada',
+            $consultada->substituidaPor !== '' => 'substituida',
+            default => 'autorizada',
+        };
+
+        return [
+            'rps' => "{$consulta->numero}/{$consulta->serie}",
+            'estado' => $estado,
+            'titulo' => match ($estado) {
+                'sem-nota' => __('Este RPS não virou NFS-e'),
+                'cancelada' => __('NFS-e :numero cancelada', ['numero' => $consultada->numero]),
+                'substituida' => __('NFS-e :numero substituída', ['numero' => $consultada->numero]),
+                default => __('NFS-e :numero autorizada', ['numero' => $consultada->numero]),
+            },
+            'apoio' => match ($estado) {
+                'sem-nota' => __('O provedor não devolveu nota para este RPS. Se o lote ainda está em processamento, consulte de novo em instantes.'),
+                'cancelada' => $consultada->canceladaEm === ''
+                    ? __('O provedor devolveu o registro do cancelamento, sem data.')
+                    : __('Cancelamento registrado em :data.', ['data' => $consultada->canceladaEm]),
+                'substituida' => __('Substituída pela NFS-e :outra.', ['outra' => $consultada->substituidaPor]),
+                default => __('Sem registro de cancelamento nem de substituição no retorno.'),
+            },
+            'campos' => array_filter([
+                __('Número da NFS-e') => $consultada->numero,
+                __('Código de verificação') => $consultada->codigoDeVerificacao,
+                __('Emitida em') => $consultada->emitidaEm,
+                __('Cancelada em') => $consultada->canceladaEm,
+                __('Substituída por') => $consultada->substituidaPor,
+            ], static fn (string $valor): bool => $valor !== ''),
+            'mensagens' => array_map(
+                static fn (array $mensagem): string => trim("{$mensagem['codigo']} {$mensagem['descricao']}"),
+                $consultada->mensagens->paraArray(),
+            ),
+            'eh_da_nota' => $ehDaNota,
+            'situacao_aqui' => $nota->status->getLabel(),
+            'divergencias' => $conferencia->divergencias($nota, $consultada, $consulta->numero, $consulta->serie),
+            'pode_guardar_evento' => $ehDaNota && $consultada->temDocumentoDeEvento()
+                && $nota->status->teveEvento() && ! $nota->temXmlDoEvento(),
+        ];
     }
 
     /**

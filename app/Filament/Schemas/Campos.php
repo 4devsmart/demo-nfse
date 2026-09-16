@@ -103,7 +103,27 @@ final class Campos
     /**
      * Percentual guarda quatro casas no banco, mas mostrar "5,0000" so atrapalha
      * quem le. Aparece "5"; aparece "2,75" quando ha fracao.
+     *
+     * Padrao brasileiro, e so ele: virgula nas casas decimais e ponto nenhum. A
+     * mascara vai sem separador de milhar, que num percentual de ate 100 nunca
+     * aparece. So a mascara nao bastava: ela limpa o campo depois que o ponto
+     * entra, e colar "0.65" virava "065", 65%. Por isso o ponto e barrado antes
+     * de entrar, na digitacao (`beforeinput`, que tambem cobre teclado de
+     * celular e o decimal do teclado numerico) e na colagem. A validacao recusa
+     * o ponto que chegar por qualquer outro caminho.
      */
+    /**
+     * Os dois pontos de entrada de texto num input, fechados para o ponto. O
+     * Filament escreve estes valores sem escapar, entre aspas duplas: o
+     * JavaScript usa so aspas simples.
+     *
+     * @var array<string, string>
+     */
+    public const SEM_PONTO = [
+        'x-on:beforeinput' => "if ((\$event.data ?? '').includes('.')) \$event.preventDefault()",
+        'x-on:paste' => "if (\$event.clipboardData.getData('text').includes('.')) \$event.preventDefault()",
+    ];
+
     public static function percentual(string $nome, string $rotulo): TextInput
     {
         return TextInput::make($nome)
@@ -112,11 +132,38 @@ final class Campos
             ->inputMode('decimal')
             ->placeholder('0')
             ->default(0)
-            ->mask(RawJs::make("\$money(\$input, ',', '.', 4)"))
-            ->rule(self::valorLegivel(__('Informe um percentual como 5 ou 2,75.')))
+            ->mask(RawJs::make("\$money(\$input, ',', '', 4)"))
+            ->extraInputAttributes(self::SEM_PONTO, merge: true)
+            ->rule(self::percentualComVirgula())
             ->rule(self::ateCem())
             ->formatStateUsing(fn (mixed $state): ?string => self::comoPercentual($state))
             ->dehydrateStateUsing(fn (mixed $state): float => Dinheiro::numeroDoTexto((string) $state));
+    }
+
+    /**
+     * Percentual no padrao brasileiro. "2.75" e recusado com a razao, e nao lido
+     * como 2,75 nem como 275: o campo nao tem ponto, e o que chega com ponto nao
+     * veio da mascara.
+     */
+    private static function percentualComVirgula(): Closure
+    {
+        return static fn (): Closure => static function (string $atributo, mixed $valor, Closure $falhar): void {
+            $texto = trim(is_scalar($valor) ? (string) $valor : '');
+
+            if ($texto === '') {
+                return;
+            }
+
+            if (str_contains($texto, '.')) {
+                $falhar(__('Use vírgula nas casas decimais: 2,75, e não 2.75.'));
+
+                return;
+            }
+
+            if (preg_match('/^\d+(,\d{1,4})?$/', $texto) !== 1) {
+                $falhar(__('Informe um percentual como 5 ou 2,75.'));
+            }
+        };
     }
 
     /**
@@ -206,7 +253,7 @@ final class Campos
         }
 
         $numero = Dinheiro::numeroDoTexto((string) $state);
-        $texto = number_format($numero, 4, ',', '.');
+        $texto = number_format($numero, 4, ',', '');
 
         return rtrim(rtrim($texto, '0'), ',');
     }

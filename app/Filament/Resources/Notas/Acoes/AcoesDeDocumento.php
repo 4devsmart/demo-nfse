@@ -92,11 +92,13 @@ final class AcoesDeDocumento
             ->icon(Heroicon::OutlinedInboxArrowDown)
             ->color('gray')
             ->modalHeading(__('Buscar o documento do cancelamento'))
-            ->modalDescription(__('Percorre a fila DF-e do emitente até achar o evento desta nota. Nada é enviado ao provedor: é só leitura.'))
+            ->modalDescription(fn (Nota $nota): string => $nota->identificadaPeloNumero()
+                ? __('Consulta esta nota no provedor pelo RPS e guarda o registro do cancelamento que vem com ela. Nada é enviado ao provedor: é só leitura.')
+                : __('Percorre a fila DF-e do emitente até achar o evento desta nota. Nada é enviado ao provedor: é só leitura.'))
             ->modalSubmitActionLabel(__('Buscar'))
             ->visible(fn (Nota $nota): bool => $nota->status->teveEvento() && ! $nota->temXmlDoEvento())
             ->action(fn (Nota $nota, BuscarXmlDoEvento $buscar) => OperacaoFiscal::executar(
-                fn () => self::avisarABusca($buscar->executar($nota)),
+                fn () => self::avisarABusca($buscar->executar($nota), $nota),
             ));
 
         return OperacaoFiscal::bloqueadaQuando($acao, fn ($impedimentos): ?string => $impedimentos->paraBuscarOEvento());
@@ -150,14 +152,20 @@ final class AcoesDeDocumento
      * evento, e a fila DF-e é do Padrão Nacional, não de todo provedor. O aviso
      * não afirma que a fila acabou, só que o evento não estava nela.
      */
-    private static function avisarABusca(bool $achou): void
+    private static function avisarABusca(bool $achou, Nota $nota): void
     {
         Notification::make()
             ->status($achou ? 'success' : 'warning')
-            ->title($achou ? __('Documento do evento guardado') : __('Nenhum evento desta nota na fila'))
-            ->body($achou
-                ? __('Ele está em "Baixar XML → XML do evento".')
-                : __('A fila DF-e do emitente não trouxe evento para esta chave. O ADN publica o documento depois de registrar o evento: se ele é recente, vale tentar de novo em alguns minutos.'))
+            ->title(match (true) {
+                $achou => __('Documento do evento guardado'),
+                $nota->identificadaPeloNumero() => __('O provedor não devolveu registro de evento'),
+                default => __('Nenhum evento desta nota na fila'),
+            })
+            ->body(match (true) {
+                $achou => __('Ele está em "Baixar XML → XML do evento".'),
+                $nota->identificadaPeloNumero() => __('A consulta pelo RPS desta nota não trouxe cancelamento nem substituição. Confira pela "Consultar por RPS", que mostra o que o provedor respondeu.'),
+                default => __('A fila DF-e do emitente não trouxe evento para esta chave. O ADN publica o documento depois de registrar o evento: se ele é recente, vale tentar de novo em alguns minutos.'),
+            })
             ->persistent()
             ->send();
     }

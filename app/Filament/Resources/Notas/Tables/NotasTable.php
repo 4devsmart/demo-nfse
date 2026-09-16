@@ -125,6 +125,7 @@ class NotasTable
                 ->toggle()
                 ->query(fn (Builder $query): Builder => $query->whereIn('status', [
                     StatusNota::Indeterminada,
+                    StatusNota::EmProcessamento,
                     StatusNota::Rejeitada,
                 ])),
         ];

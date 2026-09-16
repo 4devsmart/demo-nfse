@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Fiscal\Dps;
 
+use App\Domain\ValueObjects\CodigoIbge;
+
 /**
  * `infDPS.ibscbs`, o grupo da Reforma Tributaria do Consumo.
  *
@@ -31,6 +33,11 @@ namespace App\Fiscal\Dps;
  *   - `gTribRegular` e `gDif`, que descrevem regime especifico e diferimento.
  *     A wrapper aceita os dois; nenhum deles tem sentido nas 71 classificacoes
  *     de servico enquanto o projeto nao modelar regime especifico.
+ *
+ * O `nfse.cLocalidadeIncid` e o unico campo do lado da NFS-e que sai daqui, e
+ * so para os provedores que o leem dentro do RPS (ver
+ * `ProvedorPrevisto::exigeLocalidadeDeIncidencia()`). Sem ele o gravador do
+ * GISS 2.04 escreve `<cLocalidadeIncid>0000000</cLocalidadeIncid>`.
  */
 final readonly class TributacaoIbsCbs
 {
@@ -40,6 +47,8 @@ final readonly class TributacaoIbsCbs
         public string $indicadorDaOperacao = '',
         public bool $paraConsumidorFinal = false,
         public ?string $codigoDeCreditoPresumido = null,
+        public ?CodigoIbge $localidadeDeIncidencia = null,
+        public string $nomeDaLocalidade = '',
     ) {}
 
     public static function classificadaComo(string $situacaoTributaria, string $classificacaoTributaria): self
@@ -71,10 +80,22 @@ final readonly class TributacaoIbsCbs
         return $this->com(codigoDeCreditoPresumido: blank($codigo) ? null : $codigo);
     }
 
+    /**
+     * O local da operacao do art. 11 da LC 214/2025. Na regra geral e o
+     * domicilio do tomador; imovel, servico presencial e evento puxam para
+     * onde a operacao acontece. Quem decide e quem emite: aqui so se declara.
+     */
+    public function incidindoEm(?CodigoIbge $municipio, string $nome): self
+    {
+        return $this->com(localidadeDeIncidencia: $municipio, nomeDaLocalidade: $nome);
+    }
+
     private function com(
         ?string $indicadorDaOperacao = null,
         ?bool $paraConsumidorFinal = null,
         ?string $codigoDeCreditoPresumido = null,
+        ?CodigoIbge $localidadeDeIncidencia = null,
+        ?string $nomeDaLocalidade = null,
     ): self {
         return new self(
             $this->situacaoTributaria,
@@ -82,6 +103,8 @@ final readonly class TributacaoIbsCbs
             $indicadorDaOperacao ?? $this->indicadorDaOperacao,
             $paraConsumidorFinal ?? $this->paraConsumidorFinal,
             $codigoDeCreditoPresumido ?? $this->codigoDeCreditoPresumido,
+            $localidadeDeIncidencia ?? $this->localidadeDeIncidencia,
+            $nomeDaLocalidade ?? $this->nomeDaLocalidade,
         );
     }
 
@@ -108,6 +131,10 @@ final readonly class TributacaoIbsCbs
                 'CST' => $this->situacaoTributaria,
                 'cClassTrib' => $this->classificacaoTributaria,
                 'cCredPres' => $this->codigoDeCreditoPresumido,
+            ],
+            'nfse' => [
+                'cLocalidadeIncid' => $this->localidadeDeIncidencia === null ? null : (string) $this->localidadeDeIncidencia,
+                'xLocalidadeIncid' => $this->nomeDaLocalidade,
             ],
         ];
     }

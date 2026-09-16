@@ -138,6 +138,7 @@ class NotaInfolist
 
                 TextEntry::make('cnae')->label(__('CNAE'))->placeholder('—'),
                 TextEntry::make('item_lista_servico')->label(__('Item da lista — ABRASF'))->placeholder('—'),
+                TextEntry::make('codigo_tributacao_municipio')->label(__('Código de tributação municipal'))->placeholder('—'),
             ]);
     }
 

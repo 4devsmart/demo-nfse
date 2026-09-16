@@ -9,6 +9,7 @@ use App\Fiscal\Excecoes\FalhaFiscal;
 use App\Fiscal\Pedidos\ConsultaPorRps;
 use App\Fiscal\Pedidos\ContextoDoProvedor;
 use App\Fiscal\Pedidos\MotivoDoCancelamento;
+use App\Fiscal\Pedidos\NotaCancelada;
 use App\Fiscal\Pedidos\NotaSubstituida;
 use App\Fiscal\Pedidos\PayloadDps;
 use App\Fiscal\Respostas\Danfse;
@@ -57,9 +58,17 @@ interface GatewayFiscal
     public function consultarNota(ContextoDoProvedor $contexto, string $chave): RespostaCrua;
 
     /**
+     * O desfecho de um lote assincrono, pelo protocolo que a transmissao
+     * devolveu. Responde no formato da transmissao: e a segunda metade dela.
+     *
      * @throws FalhaFiscal
      */
-    public function cancelarNota(ContextoDoProvedor $contexto, string $chave, MotivoDoCancelamento $motivo): EventoRegistrado;
+    public function consultarLote(ContextoDoProvedor $contexto, string $protocolo): NotaTransmitida;
+
+    /**
+     * @throws FalhaFiscal
+     */
+    public function cancelarNota(ContextoDoProvedor $contexto, NotaCancelada $nota, MotivoDoCancelamento $motivo): EventoRegistrado;
 
     /**
      * "Aquele RPS virou nota?", o mesmo par serie/numero que este sistema

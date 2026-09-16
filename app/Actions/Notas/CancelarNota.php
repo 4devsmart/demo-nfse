@@ -8,6 +8,7 @@ use App\Domain\Enums\StatusNota;
 use App\Fiscal\Contracts\GatewayFiscal;
 use App\Fiscal\Excecoes\DesfechoIndeterminado;
 use App\Fiscal\Pedidos\MotivoDoCancelamento;
+use App\Fiscal\Pedidos\NotaCancelada;
 use App\Fiscal\Respostas\EventoRegistrado;
 use App\Fiscal\Traducao\ContextoDaEmpresa;
 use App\Models\Nota;
@@ -35,7 +36,7 @@ final readonly class CancelarNota
         try {
             $evento = $this->gateway->cancelarNota(
                 $this->contextoDaEmpresa->montar($nota->empresa, $nota->ambiente),
-                (string) $nota->chave,
+                $this->identificacao($nota),
                 $motivo,
             );
         } catch (DesfechoIndeterminado $falha) {
@@ -47,6 +48,23 @@ final readonly class CancelarNota
         $this->guardarResultado($nota, $evento, $motivo);
 
         return $evento;
+    }
+
+    /**
+     * Padrao Nacional pela chave, ABRASF pelo numero. `ImpedimentosDaNota` ja
+     * garantiu que o dado de cada caminho existe.
+     */
+    private function identificacao(Nota $nota): NotaCancelada
+    {
+        if ($nota->identificadaPeloNumero()) {
+            return NotaCancelada::peloNumero(
+                (string) $nota->numero_nfse,
+                (string) $nota->codigo_verificacao,
+                (string) $nota->chave,
+            );
+        }
+
+        return NotaCancelada::pelaChave((string) $nota->chave);
     }
 
     /**

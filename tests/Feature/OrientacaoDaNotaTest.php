@@ -159,6 +159,7 @@ class OrientacaoDaNotaTest extends TestCase
             'codigo_servico' => '140101',
             'cnae' => '9511800',
             'item_lista_servico' => '14.01',
+            'codigo_tributacao_municipio' => '1401',
             'descricao_servico' => 'Manutenção',
             'valor_servico' => 1000,
             'aliquota_iss' => 5,
@@ -171,7 +172,9 @@ class OrientacaoDaNotaTest extends TestCase
         $this->assertSame('140101', $servico['cServ']);
         $this->assertSame('9511800', $servico['codigoCnae']);
         $this->assertSame('14.01', $servico['itemListaServico']);
+        $this->assertSame('1401', $servico['cTribMun']);
         $this->assertSame('3304557', $servico['cMunPrestacao']);
+        $this->assertSame('3304557', $servico['municipioIncidencia']);
         $this->assertSame(50.0, $valores->issqnDevido()->emReais());
         $this->assertSame(950.0, $valores->valorLiquido()->emReais());
     }

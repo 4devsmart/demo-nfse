@@ -12,6 +12,7 @@ use App\Domain\Enums\TipoPessoa;
 use App\Domain\Enums\TipoSuspensaoDeExigibilidade;
 use App\Domain\Enums\TributacaoIssqn;
 use App\Domain\Notas\ImpedimentosDaNota;
+use App\Domain\Notas\LocalDeIncidenciaDoIssqn;
 use App\Domain\ValueObjects\Aliquota;
 use App\Domain\ValueObjects\Competencia;
 use App\Domain\ValueObjects\Dinheiro;
@@ -53,6 +54,7 @@ use Illuminate\Support\Carbon;
  * @property string $codigo_servico
  * @property string|null $cnae
  * @property string|null $item_lista_servico
+ * @property string|null $codigo_tributacao_municipio `cTribMun`, da tabela do município
  * @property string|null $nbs
  * @property string $valor_servico
  * @property string $aliquota_iss
@@ -73,6 +75,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $cst_ibs_cbs CST do IBS/CBS, três dígitos
  * @property string|null $indicador_de_operacao `cIndOp`, seis dígitos
  * @property string|null $classificacao_tributaria `cClassTrib`, seis dígitos
+ * @property int|null $cidade_incidencia_ibs_cbs_id `cLocalidadeIncid`, só para os provedores que o pedem no RPS
  * @property string|null $codigo_credito_presumido
  * @property TipoSuspensaoDeExigibilidade|null $tipo_suspensao
  * @property string|null $numero_processo_suspensao
@@ -98,13 +101,14 @@ use Illuminate\Support\Carbon;
  * @property-read Empresa $empresa
  * @property-read Cliente $cliente
  * @property-read Cidade $cidadePrestacao
+ * @property-read Cidade|null $cidadeIncidenciaIbsCbs
  * @property-read Nota|null $substituida
  * @property-read Nota|null $substituta
  */
 #[Fillable([
     'empresa_id', 'cliente_id', 'cidade_prestacao_id', 'substitui_nota_id',
     'referencia', 'serie', 'numero', 'competencia', 'ambiente', 'status',
-    'descricao_servico', 'codigo_servico', 'cnae', 'item_lista_servico', 'nbs',
+    'descricao_servico', 'codigo_servico', 'cnae', 'item_lista_servico', 'codigo_tributacao_municipio', 'nbs',
     'valor_servico', 'aliquota_iss', 'deducoes',
     'desconto_incondicionado', 'desconto_condicionado',
     'tributacao_issqn', 'retencao_issqn',
@@ -112,6 +116,7 @@ use Illuminate\Support\Carbon;
     'aliquota_csll', 'aliquota_irrf', 'aliquota_previdenciaria',
     'retem_pis', 'retem_cofins', 'retem_csll',
     'cst_ibs_cbs', 'indicador_de_operacao', 'classificacao_tributaria', 'codigo_credito_presumido',
+    'cidade_incidencia_ibs_cbs_id',
     'tipo_suspensao', 'numero_processo_suspensao',
     'numero_beneficio_municipal', 'percentual_reducao_base',
     'total_tributos_federais', 'total_tributos_estaduais', 'total_tributos_municipais',
@@ -123,6 +128,9 @@ class Nota extends Model
     use HasFactory;
 
     protected $table = 'notas';
+
+    /** Como a API nomeia o leiaute do Padrao Nacional, e como ele fica em `provedor`. */
+    private const LEIAUTE_NACIONAL = 'padrao_nacional';
 
     protected function casts(): array
     {
@@ -186,6 +194,11 @@ class Nota extends Model
         return $this->belongsTo(Cidade::class, 'cidade_prestacao_id');
     }
 
+    public function cidadeIncidenciaIbsCbs(): BelongsTo
+    {
+        return $this->belongsTo(Cidade::class, 'cidade_incidencia_ibs_cbs_id');
+    }
+
     public function competenciaDoServico(): Competencia
     {
         return Competencia::noMesDe($this->competencia);
@@ -201,12 +214,31 @@ class Nota extends Model
         return Aliquota::deQuatroCasas($this->aliquota_iss);
     }
 
+    /**
+     * O provedor que autorizou a nota a localiza pelo numero, e nao pela chave:
+     * ABRASF e leiautes proprios. O leiaute fica gravado em `provedor` desde a
+     * geracao da DPS ("Giss (abrasf)"). Sem ele vale o caminho de sempre, que e
+     * o do Padrao Nacional.
+     */
+    public function identificadaPeloNumero(): bool
+    {
+        return filled($this->provedor) && ! str_ends_with((string) $this->provedor, '('.self::LEIAUTE_NACIONAL.')');
+    }
+
     public function servicoPrestado(): ServicoPrestado
     {
         return ServicoPrestado::prestadoEm($this->cidadePrestacao->codigo(), $this->codigo_servico, $this->descricao_servico)
             ->comCnae((string) $this->cnae)
             ->comItemDaListaDeServico((string) $this->item_lista_servico)
-            ->comNbs((string) $this->nbs);
+            ->comCodigoDeTributacaoMunicipal((string) $this->codigo_tributacao_municipio)
+            ->comNbs((string) $this->nbs)
+            ->comIssqnDevidoEm(LocalDeIncidenciaDoIssqn::doServico(
+                $this->codigo_servico,
+                $this->tributacao_issqn,
+                $this->empresa->municipio(),
+                $this->cidadePrestacao->codigo(),
+                $this->cliente->municipio(),
+            ));
     }
 
     public function valoresDoServico(): ValoresDoServico
@@ -281,7 +313,8 @@ class Nota extends Model
         $ibsCbs = TributacaoIbsCbs::classificadaComo((string) $this->cst_ibs_cbs, (string) $this->classificacao_tributaria)
             ->naOperacao($this->indicador_de_operacao)
             ->paraConsumidorFinal($this->cliente->tipo_pessoa === TipoPessoa::Fisica)
-            ->comCreditoPresumido($this->codigo_credito_presumido);
+            ->comCreditoPresumido($this->codigo_credito_presumido)
+            ->incidindoEm($this->cidadeIncidenciaIbsCbs?->codigo(), (string) $this->cidadeIncidenciaIbsCbs?->nome);
 
         return $ibsCbs->estaZerado() ? null : $ibsCbs;
     }

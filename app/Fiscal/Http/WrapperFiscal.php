@@ -11,6 +11,7 @@ use App\Fiscal\Excecoes\FalhaFiscal;
 use App\Fiscal\Pedidos\ConsultaPorRps;
 use App\Fiscal\Pedidos\ContextoDoProvedor;
 use App\Fiscal\Pedidos\MotivoDoCancelamento;
+use App\Fiscal\Pedidos\NotaCancelada;
 use App\Fiscal\Pedidos\NotaSubstituida;
 use App\Fiscal\Pedidos\PayloadDps;
 use App\Fiscal\Respostas\Danfse;
@@ -77,6 +78,19 @@ final readonly class WrapperFiscal implements GatewayFiscal
         ));
     }
 
+    /**
+     * So leitura, e por isso sem `gravaNoProvedor`: o lote ja foi entregue na
+     * transmissao, e perguntar de novo nao cria documento nenhum.
+     */
+    public function consultarLote(ContextoDoProvedor $contexto, string $protocolo): NotaTransmitida
+    {
+        return NotaTransmitida::doCorpoDaResposta($this->postar(
+            '/v1/nfse/transmissao/lote',
+            ['protocolo' => $protocolo, ...$contexto->paraApi()],
+            aceitando: [422],
+        ));
+    }
+
     public function consultarDps(ContextoDoProvedor $contexto, string $idDps): RespostaCrua
     {
         return RespostaCrua::doCorpoDaResposta($this->postar(
@@ -93,11 +107,11 @@ final readonly class WrapperFiscal implements GatewayFiscal
         ));
     }
 
-    public function cancelarNota(ContextoDoProvedor $contexto, string $chave, MotivoDoCancelamento $motivo): EventoRegistrado
+    public function cancelarNota(ContextoDoProvedor $contexto, NotaCancelada $nota, MotivoDoCancelamento $motivo): EventoRegistrado
     {
         return EventoRegistrado::doCorpoDaResposta($this->postar(
             '/v1/nfse/eventos/cancelamento',
-            ['chave' => $chave, 'evento' => $motivo->paraApi(), ...$contexto->paraApi()],
+            [...$nota->paraApi(), 'evento' => [...$motivo->paraApi(), ...$nota->paraEvento()], ...$contexto->paraApi()],
             aceitando: [422],
             gravaNoProvedor: true,
         ));

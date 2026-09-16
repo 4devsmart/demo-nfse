@@ -29,11 +29,22 @@ class ServicoPrestadoTest extends TestCase
         $this->assertSame([
             'cMunPrestacao' => '3304557',
             'cServ' => '010701',
+            'cTribMun' => '',
             'xDescServ' => 'Desenvolvimento de software',
             'codigoCnae' => '6201501',
             'itemListaServico' => '01.04',
             'cNBS' => '',
+            'municipioIncidencia' => null,
         ], $servico->paraApi());
+    }
+
+    public function test_o_municipio_de_incidencia_do_issqn_vai_a_parte_do_da_prestacao(): void
+    {
+        $servico = ServicoPrestado::prestadoEm(CodigoIbge::deSeteDigitos('3550308'), '010701', 'Consultoria')
+            ->comIssqnDevidoEm(CodigoIbge::deSeteDigitos('3518800'));
+
+        $this->assertSame('3550308', $servico->paraApi()['cMunPrestacao']);
+        $this->assertSame('3518800', $servico->paraApi()['municipioIncidencia']);
     }
 
     public function test_sem_cnae_nem_item_os_campos_ficam_vazios_para_serem_podados(): void

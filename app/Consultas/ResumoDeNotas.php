@@ -66,7 +66,7 @@ final readonly class ResumoDeNotas
     public function precisamDeAtencao(): int
     {
         return Nota::query()
-            ->whereIn('status', [StatusNota::Indeterminada, StatusNota::Rejeitada])
+            ->whereIn('status', [StatusNota::Indeterminada, StatusNota::EmProcessamento, StatusNota::Rejeitada])
             ->count();
     }
 }

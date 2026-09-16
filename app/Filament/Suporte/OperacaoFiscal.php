@@ -69,6 +69,19 @@ final class OperacaoFiscal
      */
     public static function avisarDesfechoDaNota(Nota $nota): void
     {
+        // Lote em processamento não é sucesso nem recusa: o aviso diz o que
+        // fazer, e não pinta de vermelho um envio que chegou.
+        if ($nota->status->aguardaLote()) {
+            Notification::make()
+                ->info()
+                ->title($nota->status->getLabel())
+                ->body(__(':passo Protocolo :protocolo.', ['passo' => $nota->status->proximoPasso(), 'protocolo' => $nota->protocolo]))
+                ->persistent()
+                ->send();
+
+            return;
+        }
+
         Notification::make()
             ->status($nota->status->getColor() === 'success' ? 'success' : 'danger')
             ->title($nota->status->getLabel())

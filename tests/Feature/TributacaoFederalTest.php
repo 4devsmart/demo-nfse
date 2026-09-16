@@ -11,6 +11,7 @@ use App\Domain\Enums\TipoPessoa;
 use App\Filament\Resources\Notas\Pages\EditNota;
 use App\Fiscal\Contracts\GatewayFiscal;
 use App\Fiscal\Traducao\MontadorDaDps;
+use App\Models\Cidade;
 use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Nota;
@@ -122,6 +123,27 @@ class TributacaoFederalTest extends TestCase
                 'cClassTrib' => '000001',
             ],
         ], $infDps['ibscbs']);
+    }
+
+    /**
+     * O `cLocalidadeIncid` vai no lado da NFS-e do grupo, que e onde o gravador
+     * do GISS 2.04 o procura para escrever dentro do RPS.
+     */
+    public function test_a_localidade_de_incidencia_vai_no_lado_da_nfse(): void
+    {
+        $guarulhos = Cidade::factory()->create(['nome' => 'Guarulhos', 'uf' => 'SP', 'codigo_ibge' => '3518800']);
+
+        $infDps = $this->valoresDaDps([
+            'cst_ibs_cbs' => '000',
+            'classificacao_tributaria' => '000001',
+            'indicador_de_operacao' => '020201',
+            'cidade_incidencia_ibs_cbs_id' => $guarulhos->getKey(),
+        ]);
+
+        $this->assertSame(
+            ['cLocalidadeIncid' => '3518800', 'xLocalidadeIncid' => 'Guarulhos'],
+            $infDps['ibscbs']['nfse'],
+        );
     }
 
     /**

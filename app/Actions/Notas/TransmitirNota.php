@@ -7,7 +7,6 @@ namespace App\Actions\Notas;
 use App\Domain\Enums\StatusNota;
 use App\Fiscal\Contracts\GatewayFiscal;
 use App\Fiscal\Excecoes\DesfechoIndeterminado;
-use App\Fiscal\Respostas\NotaTransmitida;
 use App\Fiscal\Traducao\ContextoDaEmpresa;
 use App\Models\Nota;
 use LogicException;
@@ -21,6 +20,7 @@ final readonly class TransmitirNota
     public function __construct(
         private GatewayFiscal $gateway,
         private ContextoDaEmpresa $contextoDaEmpresa,
+        private RegistrarDesfechoDaTransmissao $registrar,
     ) {}
 
     public function executar(Nota $nota): Nota
@@ -38,7 +38,7 @@ final readonly class TransmitirNota
             throw $falha;
         }
 
-        return $this->guardarResultado($nota, $resposta);
+        return $this->registrar->executar($nota, $resposta, acabouDeTransmitir: true);
     }
 
     private function exigirDpsGerada(Nota $nota): void
@@ -48,22 +48,6 @@ final readonly class TransmitirNota
         if ($impedimento !== null) {
             throw new LogicException($impedimento);
         }
-    }
-
-    private function guardarResultado(Nota $nota, NotaTransmitida $resposta): Nota
-    {
-        $nota->forceFill([
-            'status' => $resposta->foiAutorizada() ? StatusNota::Autorizada : StatusNota::Rejeitada,
-            'numero_nfse' => $resposta->numero ?: null,
-            'chave' => $resposta->chave ?: null,
-            'codigo_verificacao' => $resposta->codigoDeVerificacao ?: null,
-            'protocolo' => $resposta->protocolo ?: null,
-            'xml_autorizado' => $resposta->xmlEmBase64 ?: null,
-            'mensagens' => [...$resposta->erros->paraArray(), ...$resposta->alertas->paraArray()],
-            'transmitida_em' => now(),
-        ])->save();
-
-        return $nota;
     }
 
     private function marcarComoIndeterminada(Nota $nota, DesfechoIndeterminado $falha): void

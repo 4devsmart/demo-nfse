@@ -9,6 +9,7 @@ use App\Actions\Notas\BaixarDanfse;
 use App\Actions\Notas\BuscarXmlDoEvento;
 use App\Actions\Notas\CancelarNota;
 use App\Actions\Notas\ConsultarDpsPendente;
+use App\Actions\Notas\ConsultarLoteDaNota;
 use App\Actions\Notas\ConsultarNotaNoProvedor;
 use App\Actions\Notas\ConsultarPorRps;
 use App\Actions\Notas\EmitirNota;
@@ -205,9 +206,30 @@ class AcoesRecusamForaDaTelaTest extends TestCase
     }
 
     /**
-     * Falar com o provedor é sempre chamada assinada, e a falta de certificado
-     * para as seis rotas, não só as que a tela mostra.
+     * O lote só é perguntado pelo protocolo, e só enquanto não há desfecho.
+     * Nota que já saiu do processamento tem a resposta gravada.
      */
+    public function test_consultar_o_lote_recusa_fora_do_processamento_e_sem_protocolo(): void
+    {
+        $autorizada = Nota::factory()->create([
+            'empresa_id' => Empresa::factory()->comCertificado(),
+            'status' => StatusNota::Autorizada,
+            'protocolo' => 'PROTO-1',
+        ]);
+
+        $this->recusa(fn () => app(ConsultarLoteDaNota::class)->executar($autorizada), 'em processamento');
+
+        $semProtocolo = Nota::factory()->comDpsGerada()->create([
+            'empresa_id' => Empresa::factory()->comCertificado(),
+            'status' => StatusNota::EmProcessamento,
+            'protocolo' => null,
+        ]);
+
+        $this->recusa(fn () => app(ConsultarLoteDaNota::class)->executar($semProtocolo), 'protocolo');
+
+        $this->assertSame(StatusNota::EmProcessamento, $semProtocolo->refresh()->status);
+    }
+
     /**
      * A busca do evento percorre a fila DF-e do emitente inteira, e ela e
      * indexada pela chave: chamada sobre nota que nao teve evento, ela sairia
@@ -232,6 +254,10 @@ class AcoesRecusamForaDaTelaTest extends TestCase
         $this->recusa(fn () => app(BuscarXmlDoEvento::class)->executar($semChave), 'chave de acesso');
     }
 
+    /**
+     * Falar com o provedor é sempre chamada assinada, e a falta de certificado
+     * para todas as rotas, não só as que a tela mostra.
+     */
     public function test_sem_certificado_nenhuma_rota_do_provedor_sai(): void
     {
         $porTransmitir = Nota::factory()->comDpsGerada()->create();
@@ -247,6 +273,14 @@ class AcoesRecusamForaDaTelaTest extends TestCase
 
         $this->recusa(fn () => app(TransmitirNota::class)->executar($porTransmitir), $frase);
         $this->recusa(fn () => app(ConsultarDpsPendente::class)->executar($porTransmitir), $frase);
+
+        $emProcessamento = Nota::factory()->comDpsGerada()->create([
+            'empresa_id' => $porTransmitir->empresa_id,
+            'status' => StatusNota::EmProcessamento,
+            'protocolo' => 'PROTO-1',
+        ]);
+
+        $this->recusa(fn () => app(ConsultarLoteDaNota::class)->executar($emProcessamento), $frase);
         $this->recusa(fn () => app(ConsultarNotaNoProvedor::class)->executar($autorizada), $frase);
         $this->recusa(
             fn () => app(CancelarNota::class)->executar($autorizada, MotivoDoCancelamento::descrito('Emitida com erro')),

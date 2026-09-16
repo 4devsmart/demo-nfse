@@ -87,6 +87,20 @@ final readonly class ImpedimentosDaNota
         };
     }
 
+    /**
+     * O lote assincrono so tem um jeito de ser perguntado: o protocolo que a
+     * transmissao devolveu.
+     */
+    public function paraConsultarOLote(): ?string
+    {
+        return match (true) {
+            ! $this->nota->status->aguardaLote() => (string) __('Só há lote para consultar enquanto a nota está em processamento.'),
+            $this->paraFalarComOProvedor() !== null => $this->paraFalarComOProvedor(),
+            filled($this->nota->protocolo) => null,
+            default => (string) __('A consulta do lote vai pelo protocolo que a transmissão devolveu, e esta nota não tem.'),
+        };
+    }
+
     public function paraConsultarPelaChave(): ?string
     {
         return match (true) {
@@ -96,11 +110,18 @@ final readonly class ImpedimentosDaNota
         };
     }
 
+    /**
+     * O Padrao Nacional cancela pela chave de acesso; o ABRASF, pelo numero que
+     * o provedor atribuiu. Nota ABRASF com link e sem numero nao passa: o link
+     * vem no campo da chave, e o cancelamento morreria na API.
+     */
     public function paraCancelar(): ?string
     {
         return match (true) {
             ! $this->nota->status->permiteCancelar() => (string) __('Uma nota :situacao não é cancelada.', ['situacao' => $this->nota->status->getLabel()]),
             $this->paraFalarComOProvedor() !== null => $this->paraFalarComOProvedor(),
+            $this->nota->identificadaPeloNumero() && filled($this->nota->numero_nfse) => null,
+            $this->nota->identificadaPeloNumero() => (string) __('Neste provedor o cancelamento vai pelo número que ele atribuiu à nota, que esta nota não tem.'),
             filled($this->nota->chave) => null,
             default => (string) __('O cancelamento vai pela chave de acesso, que esta nota ainda não tem.'),
         };
@@ -125,7 +146,8 @@ final readonly class ImpedimentosDaNota
 
     /**
      * O documento do evento vem da fila DF-e do emitente, e a fila e indexada
-     * pela chave: sem ela nao ha o que procurar. Nota que ja tem o documento
+     * pela chave: sem ela nao ha o que procurar. No ABRASF ele vem da consulta
+     * pelo RPS, que a nota sempre tem. Nota que ja tem o documento
      * tambem nao tem: ele nao muda.
      */
     public function paraBuscarOEvento(): ?string
@@ -133,7 +155,7 @@ final readonly class ImpedimentosDaNota
         return match (true) {
             $this->paraFalarComOProvedor() !== null => $this->paraFalarComOProvedor(),
             ! $this->nota->status->teveEvento() => (string) __('Só há evento para buscar depois que a nota é cancelada ou substituída.'),
-            blank($this->nota->chave) => (string) __('A busca é pela chave de acesso, que esta nota não tem.'),
+            blank($this->nota->chave) && ! $this->nota->identificadaPeloNumero() => (string) __('A busca é pela chave de acesso, que esta nota não tem.'),
             $this->nota->temXmlDoEvento() => (string) __('O documento do evento já está guardado nesta nota.'),
             default => null,
         };

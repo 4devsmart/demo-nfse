@@ -10,6 +10,20 @@ namespace App\Consultas;
  */
 final readonly class PadroesDaEmpresa
 {
+    /**
+     * Os campos de `paraNota()` que sao percentuais. Saem como a coluna
+     * `decimal:4` os devolve, "2.0000", e a mascara brasileira do formulario le
+     * esse ponto como milhar: aplicado cru, o ISS de 2% virava 20.000. Quem os
+     * poe num campo mascarado converte; a lista fica aqui, ao lado do
+     * mapeamento, para que percentual novo nao fique de fora.
+     *
+     * @var list<string>
+     */
+    public const PERCENTUAIS = [
+        'aliquota_iss', 'aliquota_pis', 'aliquota_cofins',
+        'aliquota_csll', 'aliquota_irrf', 'aliquota_previdenciaria',
+    ];
+
     public function __construct(private EmpresasEmitentes $empresas) {}
 
     /**
@@ -39,6 +53,7 @@ final readonly class PadroesDaEmpresa
             'codigo_servico' => $empresa->codigo_servico_padrao,
             'cnae' => $empresa->cnae_padrao,
             'item_lista_servico' => $empresa->item_lista_servico_padrao,
+            'codigo_tributacao_municipio' => $empresa->codigo_tributacao_municipio_padrao,
             'nbs' => $empresa->nbs_padrao,
             'aliquota_iss' => $empresa->aliquota_iss_padrao,
 

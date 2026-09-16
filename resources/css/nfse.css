@@ -368,6 +368,89 @@
     line-height: 1.625;
 }
 
+/* -------------------------------------------------------- consulta por RPS */
+
+/*
+ * A resposta da consulta lida. O estado da nota no provedor vem primeiro, com a
+ * barra lateral na cor do desfecho, como a caixa do provedor. A conferencia com
+ * a nota fica logo abaixo, porque divergencia e o que pede acao.
+ */
+
+.nfse-consulta {
+    display: grid;
+    gap: 1rem;
+}
+
+.nfse-situacao {
+    display: grid;
+    gap: 0.125rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--gray-200);
+    border-left-width: 3px;
+    border-left-color: var(--gray-400);
+    border-radius: 0.5rem;
+}
+
+.nfse-situacao--autorizada {
+    border-left-color: var(--success-500);
+}
+
+.nfse-situacao--cancelada {
+    border-left-color: var(--danger-500);
+}
+
+.nfse-situacao--substituida {
+    border-left-color: var(--warning-500);
+}
+
+.nfse-situacao__rotulo {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+}
+
+.nfse-situacao__titulo {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-950);
+}
+
+.nfse-situacao__apoio {
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+}
+
+.nfse-conferencia {
+    display: grid;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.nfse-conferencia--confere {
+    color: var(--success-700);
+    background: var(--success-50);
+}
+
+.nfse-conferencia--diverge {
+    color: var(--warning-800);
+    background: var(--warning-50);
+}
+
+.nfse-conferencia__lista {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+    padding-left: 1.125rem;
+    list-style: disc;
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
+}
+
 /* ------------------------------------------------------------------- tema */
 
 .dark .nfse-resumo__valor,
@@ -422,4 +505,24 @@
 .dark .nfse-passo__ordem {
     background: var(--gray-800);
     color: var(--gray-200);
+}
+
+.dark .nfse-situacao {
+    border-top-color: var(--gray-700);
+    border-right-color: var(--gray-700);
+    border-bottom-color: var(--gray-700);
+}
+
+.dark .nfse-situacao__titulo {
+    color: var(--gray-50);
+}
+
+.dark .nfse-conferencia--confere {
+    color: var(--success-300);
+    background: color-mix(in oklab, var(--success-500) 12%, transparent);
+}
+
+.dark .nfse-conferencia--diverge {
+    color: var(--warning-300);
+    background: color-mix(in oklab, var(--warning-500) 12%, transparent);
 }

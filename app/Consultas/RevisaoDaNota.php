@@ -82,6 +82,7 @@ final readonly class RevisaoDaNota
                 __('Código do serviço') => $this->rotuloDoCodigoDoServico($estado),
                 __('CNAE') => EstadoDoFormulario::texto($estado, 'cnae'),
                 __('Item da lista (ABRASF)') => EstadoDoFormulario::texto($estado, 'item_lista_servico'),
+                __('Código de tributação municipal') => EstadoDoFormulario::texto($estado, 'codigo_tributacao_municipio'),
             ], static fn (string $valor): bool => $valor !== ''),
             'discriminacao' => EstadoDoFormulario::texto($estado, 'descricao_servico'),
         ];
@@ -137,6 +138,7 @@ final readonly class RevisaoDaNota
             __('Retenção federal') => $this->rotuloDaRetencaoFederal($estado),
             __('IBS/CBS') => $this->rotuloDaClassificacao($estado),
             __('Indicador da operação') => $this->rotuloDoIndicador($estado),
+            __('Localidade de incidência') => $this->rotuloDaLocalidadeDeIncidencia($estado),
             __('Exigibilidade') => $suspensao === null
                 ? ''
                 : __(':tipo · processo :processo', ['tipo' => $suspensao->getLabel(), 'processo' => EstadoDoFormulario::texto($estado, 'numero_processo_suspensao')]),
@@ -293,6 +295,23 @@ final readonly class RevisaoDaNota
         }
 
         return $this->indicadores->rotuloDe($indicador) ?? $indicador;
+    }
+
+    /**
+     * Com o codigo IBGE, ao contrario do municipio da prestacao: o codigo e o
+     * que o provedor le, e e ele que se confere aqui.
+     *
+     * @param  array<string, mixed>  $estado
+     */
+    private function rotuloDaLocalidadeDeIncidencia(array $estado): string
+    {
+        $cidade = $estado['cidade_incidencia_ibs_cbs_id'] ?? null;
+
+        if ((! is_int($cidade) && ! is_string($cidade)) || $this->respondeuNao($estado, 'tem_ibs_cbs')) {
+            return '';
+        }
+
+        return $this->cidades->rotuloDe($cidade) ?? '';
     }
 
     /**

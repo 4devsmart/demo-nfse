@@ -31,7 +31,7 @@ services:
   # Atende HTTP. Sem porta publicada: quem chama e o container `app`, pelo nome
   # do servico na rede interna. E assim que a imagem foi desenhada.
   fiscal-api:
-    image: ghcr.io/4devsmart/wrapper-api/api:v1
+    image: ghcr.io/4devsmart/wrapper-api/api:v1.3.1
     # A imagem existe so para linux/amd64: a ACBrLib e biblioteca nativa. Sem
     # fixar a plataforma, o pull em Mac com Apple Silicon e em Windows ARM para
     # com "no matching manifest for linux/arm64/v8". Fixando, o Docker Desktop
@@ -49,7 +49,7 @@ services:
 
   # Fala com o ACBr. O encontro com o `fiscal-api` e o socket em /run/wrapper.
   fiscal-worker:
-    image: ghcr.io/4devsmart/wrapper-api/api:v1
+    image: ghcr.io/4devsmart/wrapper-api/api:v1.3.1
     platform: linux/amd64
     command: ["worker"]
     # A imagem traz um healthcheck HTTP, que so vale para o `fiscal-api`. O

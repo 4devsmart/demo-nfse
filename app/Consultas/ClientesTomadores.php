@@ -31,6 +31,15 @@ final readonly class ClientesTomadores
         return $id === null ? null : Cliente::query()->find($id);
     }
 
+    /**
+     * O municipio do tomador, pelo id da cidade: e o que os seletores de
+     * municipio guardam.
+     */
+    public function cidadeDe(int|string|null $id): ?int
+    {
+        return $this->encontrar($id)?->cidade_id;
+    }
+
     public function rotuloDe(int|string|null $id): ?string
     {
         $cliente = $id === null ? null : Cliente::query()->find($id);

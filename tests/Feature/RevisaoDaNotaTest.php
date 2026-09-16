@@ -219,6 +219,24 @@ class RevisaoDaNotaTest extends TestCase
         $this->assertSame('BM-2026-77 · reduz 20,00% da base', $linhas['Benefício municipal']);
     }
 
+    /**
+     * Com o codigo IBGE: e ele que o provedor le. Respondido "Não" ao IBS/CBS,
+     * a linha some, porque o grupo inteiro deixa de ir na DPS.
+     */
+    public function test_a_localidade_de_incidencia_aparece_com_o_codigo_ibge(): void
+    {
+        $guarulhos = Cidade::factory()->create(['nome' => 'Guarulhos', 'uf' => 'SP', 'codigo_ibge' => '3518800']);
+
+        $this->assertSame(
+            'Guarulhos/SP — 3518800',
+            $this->revisao->tributacao(['cidade_incidencia_ibs_cbs_id' => $guarulhos->getKey()])['Localidade de incidência'],
+        );
+        $this->assertArrayNotHasKey(
+            'Localidade de incidência',
+            $this->revisao->tributacao(['tem_ibs_cbs' => false, 'cidade_incidencia_ibs_cbs_id' => $guarulhos->getKey()]),
+        );
+    }
+
     public function test_tributacao_e_retencao_desconhecidas_viram_travessao(): void
     {
         $linhas = $this->revisao->tributacao([]);

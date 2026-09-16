@@ -262,6 +262,12 @@ class EmpresaForm
                     ->getSearchResultsUsing(fn (string $search): array => $servicos->procurarItens($search))
                     ->getOptionLabelUsing(fn (mixed $value, ?Empresa $record): ?string => $servicos->rotuloDeItem($value, $record?->item_lista_servico_padrao))
                     ->helperText(__('Só é lido por provedores fora do Padrão Nacional.')),
+
+                TextInput::make('codigo_tributacao_municipio_padrao')
+                    ->label(__('Código de tributação municipal'))
+                    ->maxLength(20)
+                    ->columnSpan(4)
+                    ->helperText(__('Da tabela do município do emitente. Há provedores que recusam a nota sem ele (no GISS, rejeição E202).')),
             ]);
     }
 

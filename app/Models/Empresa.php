@@ -52,6 +52,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $codigo_servico_padrao
  * @property string|null $cnae_padrao
  * @property string|null $item_lista_servico_padrao
+ * @property string|null $codigo_tributacao_municipio_padrao `cTribMun`, da tabela do município
  * @property string|null $nbs_padrao
  * @property string $aliquota_iss_padrao decimal:4 devolve string
  * @property SituacaoTributariaPisCofins|null $cst_pis_cofins_padrao
@@ -78,7 +79,8 @@ use Illuminate\Support\Carbon;
     'cidade_id', 'cep', 'logradouro', 'numero', 'complemento', 'bairro', 'telefone', 'email',
     'regime_simples_nacional', 'regime_apuracao_simples', 'regime_especial',
     'ambiente', 'serie_dps', 'proximo_numero_dps',
-    'codigo_servico_padrao', 'cnae_padrao', 'item_lista_servico_padrao', 'nbs_padrao', 'aliquota_iss_padrao',
+    'codigo_servico_padrao', 'cnae_padrao', 'item_lista_servico_padrao', 'codigo_tributacao_municipio_padrao',
+    'nbs_padrao', 'aliquota_iss_padrao',
     'cst_pis_cofins_padrao', 'aliquota_pis_padrao', 'aliquota_cofins_padrao',
     'aliquota_csll_padrao', 'aliquota_irrf_padrao', 'aliquota_previdenciaria_padrao',
     'cst_ibs_cbs_padrao', 'indicador_de_operacao_padrao', 'classificacao_tributaria_padrao',

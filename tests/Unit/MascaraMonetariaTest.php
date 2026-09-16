@@ -97,7 +97,7 @@ class MascaraMonetariaTest extends TestCase
             'PIS de 0,65% virava 65%' => [0.65, '0,65', '0,65'],
             'IRRF de 1,5% virava 15%' => [1.5, '1,5', '1,50'],
             'uma casa decimal, que a máscara de dinheiro deslocava' => [150.5, '150,5', '150,50'],
-            'com milhar' => [1500.5, '1.500,5', '1.500,50'],
+            'com milhar: o percentual não usa ponto nem aí' => [1500.5, '1500,5', '1.500,50'],
             'inteiro passava ileso, e é por isso que 3, 1 e 11 pareciam certos' => [3, '3', '3,00'],
         ];
     }

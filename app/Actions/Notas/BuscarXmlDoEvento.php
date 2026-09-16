@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Actions\Notas;
 
 use App\Fiscal\Contracts\GatewayFiscal;
+use App\Fiscal\Pedidos\ConsultaPorRps;
+use App\Fiscal\Pedidos\ContextoDoProvedor;
+use App\Fiscal\Respostas\NfseConsultada;
 use App\Fiscal\Traducao\ContextoDaEmpresa;
 use App\Models\Nota;
 use LogicException;
@@ -23,6 +26,11 @@ use LogicException;
  * existe para que uma fila grande nao vire uma espera sem fim na tela; quando
  * ele e atingido sem achar, a resposta e "nao achei", e nao um documento
  * qualquer.
+ *
+ * O ABRASF nao tem fila DF-e nem chave. La o registro do cancelamento vem dentro
+ * da propria NFS-e, no `<NfseCancelamento>` que a consulta por RPS devolve, e e
+ * o `<CompNfse>` inteiro que se guarda: a nota e a prova do evento no mesmo
+ * documento do provedor.
  */
 final readonly class BuscarXmlDoEvento
 {
@@ -38,6 +46,11 @@ final readonly class BuscarXmlDoEvento
         $chave = $this->exigirChave($nota);
 
         $contexto = $this->contextoDaEmpresa->montar($nota->empresa, $nota->ambiente);
+
+        if ($nota->identificadaPeloNumero()) {
+            return $this->peloRps($nota, $contexto);
+        }
+
         $nsu = 0;
 
         for ($pagina = 0; $pagina < self::PAGINAS; $pagina++) {
@@ -59,6 +72,22 @@ final readonly class BuscarXmlDoEvento
         }
 
         return false;
+    }
+
+    private function peloRps(Nota $nota, ContextoDoProvedor $contexto): bool
+    {
+        $consultada = NfseConsultada::doRetorno($this->gateway->consultarPorRps(
+            $contexto,
+            ConsultaPorRps::sobreORps((string) $nota->numero, $nota->serie),
+        ));
+
+        if (! $consultada->temDocumentoDeEvento()) {
+            return false;
+        }
+
+        $nota->forceFill(['xml_evento' => base64_encode($consultada->documento)])->save();
+
+        return true;
     }
 
     private function exigirChave(Nota $nota): string

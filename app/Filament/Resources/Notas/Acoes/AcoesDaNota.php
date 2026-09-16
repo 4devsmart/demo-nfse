@@ -27,6 +27,7 @@ final class AcoesDaNota
             self::emitir(),
             self::gerarDps(),
             self::transmitir(),
+            self::consultarLote(),
             self::consultarDps(),
             self::consultarNoProvedor(),
             self::consultarPorRps(),
@@ -54,6 +55,11 @@ final class AcoesDaNota
     public static function transmitir(): Action
     {
         return AcoesDeEmissao::transmitir();
+    }
+
+    public static function consultarLote(): Action
+    {
+        return AcoesDeConsulta::consultarLote();
     }
 
     public static function consultarDps(): Action
