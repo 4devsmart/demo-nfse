@@ -34,7 +34,7 @@ As imagens da API fiscal são públicas no GitHub Container Registry, sem `docke
 ### Processador ARM (Apple Silicon e Windows ARM)
 
 A aplicação roda nativa nas duas arquiteturas. A API fiscal não: a imagem
-`ghcr.io/4devsmart/wrapper-api/api:v1.3.0` é publicada só para `linux/amd64`, e o `compose.yaml`
+`ghcr.io/4devsmart/wrapper-api/api:v1.3.1` é publicada só para `linux/amd64`, e o `compose.yaml`
 fixa `platform: linux/amd64` nos serviços `fiscal-api` e `fiscal-worker`. Esses dois sobem
 emulados.
 
