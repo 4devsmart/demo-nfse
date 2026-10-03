@@ -91,12 +91,16 @@ class DiagnosticoTest extends TestCase
     {
         $this->app->forgetInstance(GatewayFiscal::class);
 
-        Http::fake(['*/v1/nfse/municipios/*' => Http::response([
-            'codigo' => '3304557',
-            'provedor' => 'PadraoNacional',
-            'layout' => 'padrao_nacional',
-            'suportado' => true,
-        ])]);
+        Http::fake([
+            '*/v1/nfse/municipios/*' => Http::response([
+                'codigo' => '3304557',
+                'provedor' => 'PadraoNacional',
+                'layout' => 'padrao_nacional',
+                'suportado' => true,
+            ]),
+            '*/v1/ping' => Http::response(['versao' => ['commit_curto' => 'abc1234']]),
+            '*/v1/capacidades' => Http::response(['base' => '/v1', 'modulos' => []]),
+        ]);
 
         $consultar = app(ConsultarSuporteDoMunicipio::class);
         $codigo = CodigoIbge::deSeteDigitos('3304557');

@@ -176,6 +176,37 @@ class ProvedorDoEmitenteTest extends TestCase
     }
 
     /**
+     * A tabela de provedores e da versao da API. Com a chave so pelo codigo,
+     * subir uma imagem nova deixava a resposta da antiga valendo por ate um dia:
+     * Brasilia seguia "ISSNet (abrasf)" com a API ja respondendo
+     * `padrao_nacional`.
+     */
+    public function test_outra_versao_da_api_descarta_o_provedor_guardado(): void
+    {
+        $empresa = Empresa::factory()->create();
+        $consultar = app(ConsultarSuporteDoMunicipio::class);
+
+        $this->gateway->responderMunicipioCom(
+            new MunicipioAtendido($empresa->municipio(), 'ISSNet', 'abrasf', true),
+        );
+        $this->assertSame('abrasf', $consultar->executar($empresa->municipio())->layout);
+
+        $this->gateway->commitDaApi = 'def5678';
+        $this->gateway->responderMunicipioCom(
+            new MunicipioAtendido($empresa->municipio(), 'ISSNet', 'padrao_nacional', true),
+        );
+
+        // Dentro do intervalo do commit guardado, ainda vale a resposta antiga.
+        $this->assertSame('abrasf', $consultar->executar($empresa->municipio())->layout);
+
+        $this->travel(11)->minutes();
+
+        $this->assertSame('padrao_nacional', $consultar->executar($empresa->municipio())->layout);
+        $this->assertSame('padrao_nacional', $consultar->jaConsultado($empresa->municipio())?->layout);
+        $this->assertSame(2, $this->gateway->municipiosConsultados);
+    }
+
+    /**
      * A caixa marca o estado, e nao so o descreve: cor e icone dizem "atendido"
      * ou "vai recusar" antes de alguem ler a frase. Sao tres estados, e o
      * modificador da classe e o que os separa no CSS.

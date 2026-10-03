@@ -12,10 +12,24 @@ use Illuminate\Contracts\Cache\Repository as Cache;
 /**
  * Descobre quem atende o municipio antes de montar qualquer coisa. A tabela de
  * provedores muda com versao da biblioteca, nao com o dia: cachear e barato.
+ *
+ * E por isso que a chave leva o commit da API. Antes ela levava so o codigo, e
+ * trocar a imagem da API deixava a tela mostrando o leiaute antigo por ate um
+ * dia: Brasilia seguia "ISSNet (abrasf)" depois que a API nova ja respondia
+ * `padrao_nacional`.
  */
 final readonly class ConsultarSuporteDoMunicipio
 {
     private const HORAS_EM_CACHE = 24;
+
+    /**
+     * Quanto tempo o commit da API vale sem perguntar de novo. E a demora maxima
+     * para a troca de imagem aparecer, e o custo e uma ida ao `/v1/ping` por
+     * intervalo, e nao uma por consulta.
+     */
+    private const MINUTOS_DA_VERSAO = 10;
+
+    private const CHAVE_DA_VERSAO = 'versao-da-api-fiscal';
 
     public function __construct(
         private GatewayFiscal $gateway,
@@ -25,7 +39,7 @@ final readonly class ConsultarSuporteDoMunicipio
     public function executar(CodigoIbge $codigo): MunicipioAtendido
     {
         $guardado = $this->cache->remember(
-            $this->chave($codigo),
+            $this->chave($codigo, $this->versaoDaApi()),
             now()->addHours(self::HORAS_EM_CACHE),
             fn (): array => $this->corpoDe($this->gateway->municipio($codigo)),
         );
@@ -38,10 +52,20 @@ final readonly class ConsultarSuporteDoMunicipio
      * `PreverProvedorDoMunicipio` responder sem tentar a chamada, e sem que a
      * falha guardada de minutos atras esconda uma resposta boa que chegou
      * depois, pelo botao do cadastro.
+     *
+     * Sem commit guardado nao ha como saber a que versao da API a resposta
+     * pertence, e sair para a rede aqui quebraria o contrato do metodo: a
+     * resposta e `null`, e quem pergunta segue para `executar()`.
      */
     public function jaConsultado(CodigoIbge $codigo): ?MunicipioAtendido
     {
-        $guardado = $this->cache->get($this->chave($codigo));
+        $versao = $this->cache->get(self::CHAVE_DA_VERSAO);
+
+        if (! is_string($versao)) {
+            return null;
+        }
+
+        $guardado = $this->cache->get($this->chave($codigo, $versao));
 
         return is_array($guardado) ? MunicipioAtendido::doCorpoDaResposta($guardado) : null;
     }
@@ -73,8 +97,17 @@ final readonly class ConsultarSuporteDoMunicipio
         ];
     }
 
-    private function chave(CodigoIbge $codigo): string
+    private function versaoDaApi(): string
     {
-        return "municipio-nfse:{$codigo}";
+        return (string) $this->cache->remember(
+            self::CHAVE_DA_VERSAO,
+            now()->addMinutes(self::MINUTOS_DA_VERSAO),
+            fn (): string => $this->gateway->identificacao()->commit,
+        );
+    }
+
+    private function chave(CodigoIbge $codigo, string $versao): string
+    {
+        return "municipio-nfse:{$versao}:{$codigo}";
     }
 }

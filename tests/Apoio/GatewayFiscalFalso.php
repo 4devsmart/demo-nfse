@@ -23,7 +23,6 @@ use App\Fiscal\Respostas\Mensagens;
 use App\Fiscal\Respostas\MunicipioAtendido;
 use App\Fiscal\Respostas\NotaTransmitida;
 use App\Fiscal\Respostas\RespostaCrua;
-use RuntimeException;
 use Throwable;
 
 /**
@@ -51,6 +50,9 @@ final class GatewayFiscalFalso implements GatewayFiscal
 
     /** Quantas vezes a tabela de provedores foi perguntada, para cobrar o cache. */
     public int $municipiosConsultados = 0;
+
+    /** O commit que o `/v1/ping` responde: trocar e o mesmo que subir outra imagem da API. */
+    public string $commitDaApi = 'abc1234';
 
     /** Os NSU pedidos, na ordem: e por eles que se ve o cursor andar. */
     /** @var list<int> */
@@ -285,6 +287,6 @@ final class GatewayFiscalFalso implements GatewayFiscal
 
     public function identificacao(): IdentificacaoDaApi
     {
-        throw new RuntimeException('Não usado nos testes.');
+        return new IdentificacaoDaApi($this->commitDaApi, '', '/v1', []);
     }
 }
