@@ -66,9 +66,9 @@ up: ## Sobe a stack de desenvolvimento (app + fiscal-api + fiscal-worker)
 down: ## Derruba a stack
 	$(COMPOSE) down
 
-# O `pull` nao e redundante, e esquece-lo custa caro. A tag `v1` da wrapper-api e
+# O `pull` nao e redundante, e esquece-lo custa caro. A tag `latest` da wrapper-api e
 # movel: quando a imagem e reconstruida la, a tag passa a apontar para outro
-# digest, mas a copia local continua satisfazendo `v1` e o `up` nao busca nada.
+# digest, mas a copia local continua satisfazendo `latest` e o `up` nao busca nada.
 # O container sobe com a versao velha sem um aviso sequer, e o defeito que voce
 # esperava ver corrigido continua ali.
 #

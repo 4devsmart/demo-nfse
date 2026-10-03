@@ -34,7 +34,7 @@ As imagens da API fiscal são públicas no GitHub Container Registry, sem `docke
 ### Processador ARM (Apple Silicon e Windows ARM)
 
 A aplicação roda nativa nas duas arquiteturas. A API fiscal não: a imagem
-`ghcr.io/4devsmart/wrapper-api/api:v1.3.1` é publicada só para `linux/amd64`, e o `compose.yaml`
+`ghcr.io/4devsmart/wrapper-api/api:latest` é publicada só para `linux/amd64`, e o `compose.yaml`
 fixa `platform: linux/amd64` nos serviços `fiscal-api` e `fiscal-worker`. Esses dois sobem
 emulados.
 
@@ -137,6 +137,11 @@ minutos.
 | <http://localhost:8081/docs> | o mesmo Swagger, direto da API. Só em desenvolvimento |
 
 As portas saem de `APP_PORT` e `FISCAL_PORT`, no `.env`.
+
+A API fiscal sobe com a imagem `latest` do GHCR. Para testar um build local da wrapper-api,
+aponte `FISCAL_API_IMAGE` no `.env` para ele (por exemplo `wrapper-api:dev`) e rode
+`docker compose up -d fiscal-api fiscal-worker`. Com imagem local, não use `make atualizar-api`:
+o `pull` falha, porque a imagem não existe no registro.
 
 `make logs` mostra os três containers. `make pail` mostra só o log da aplicação, formatado.
 
